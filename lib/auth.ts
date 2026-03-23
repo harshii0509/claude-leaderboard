@@ -4,6 +4,7 @@ import { SupabaseAdapter } from '@auth/supabase-adapter'
 import { supabaseAdmin } from './db'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  basePath: '/api/auth',
   trustHost: true,
   logger: {
     error(error: Error) {
