@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+public/__pycache__/
 
 # debug
 npm-debug.log*
