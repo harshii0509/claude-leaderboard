@@ -15,6 +15,7 @@ Key design decisions:
 
 import json
 import os
+import ssl
 import sys
 import urllib.request
 import urllib.error
@@ -223,8 +224,16 @@ def main():
         method="POST",
     )
 
+    # Build SSL context: use system CA bundle if the default Python bundle is missing
+    ssl_ctx = ssl.create_default_context()
+    if not ssl_ctx.get_ca_certs():
+        for ca_path in ("/etc/ssl/cert.pem", "/etc/ssl/certs/ca-certificates.crt"):
+            if os.path.exists(ca_path):
+                ssl_ctx.load_verify_locations(ca_path)
+                break
+
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=30, context=ssl_ctx) as resp:
             resp.read()
     except urllib.error.HTTPError as e:
         print(f"Sync failed: HTTP {e.code}", file=sys.stderr)
