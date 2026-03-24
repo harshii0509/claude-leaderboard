@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import StatCard from '@/components/StatCard'
 import ActivityHeatmap from '@/components/ActivityHeatmap'
+import DeleteAccountButton from './DeleteAccountButton'
 
 async function getUserStats(userId: string) {
   const { data: stats } = await supabaseAdmin
@@ -23,6 +24,25 @@ async function getUserStats(userId: string) {
     .order('date', { ascending: true })
 
   return { stats, activity: activity ?? [] }
+}
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return 'Never synced'
+  const diff = Date.now() - new Date(iso).getTime()
+  const minutes = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days = Math.floor(diff / 86_400_000)
+  if (minutes < 60) return `Last synced ${minutes <= 1 ? 'just now' : `${minutes} minutes ago`}`
+  if (hours < 24) return `Last synced ${hours} hour${hours === 1 ? '' : 's'} ago`
+  return `Last synced ${days} day${days === 1 ? '' : 's'} ago`
+}
+
+function syncStatus(iso: string | null): 'green' | 'yellow' | 'red' {
+  if (!iso) return 'red'
+  const days = (Date.now() - new Date(iso).getTime()) / 86_400_000
+  if (days < 1) return 'green'
+  if (days < 7) return 'yellow'
+  return 'red'
 }
 
 function fmt(n: number) {
@@ -71,6 +91,23 @@ export default async function ProfilePage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--color-text)]">{session.user.name}</h1>
             <p className="text-sm text-[var(--color-muted)]">{session.user.email}</p>
+            {(() => {
+              const status = syncStatus(stats?.last_synced_at ?? null)
+              const label = relativeTime(stats?.last_synced_at ?? null)
+              const colors = {
+                green: 'bg-green-500/10 text-green-600 border-green-500/20',
+                yellow: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
+                red: 'bg-red-500/10 text-red-500 border-red-500/20',
+              }
+              return (
+                <span className={`inline-flex items-center gap-1.5 mt-1.5 text-xs px-2 py-0.5 rounded-full border ${colors[status]}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${status === 'green' ? 'bg-green-500' : status === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                  {status === 'red' && !stats?.last_synced_at
+                    ? <><span>{label}</span> &mdash; <Link href="/setup" className="underline underline-offset-2">set up sync</Link></>
+                    : label}
+                </span>
+              )
+            })()}
           </div>
         </div>
 
@@ -131,6 +168,24 @@ export default async function ProfilePage() {
             </div>
           </div>
         )}
+        {/* Data & Privacy */}
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-4">Data &amp; Privacy</p>
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="text-sm text-[var(--color-text)] font-medium mb-1">Uninstall the sync hook</p>
+              <ol className="list-decimal list-inside text-sm text-[var(--color-muted)] space-y-1">
+                <li>Remove the Stop hook entry for <code className="text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">sync_config.json</code> from <code className="text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">~/.claude/settings.json</code></li>
+                <li>Delete <code className="text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">~/.claude/sync_config.json</code></li>
+              </ol>
+            </div>
+            <div className="border-t border-[var(--color-border)] pt-4">
+              <p className="text-sm text-[var(--color-text)] font-medium mb-1">Delete account</p>
+              <p className="text-sm text-[var(--color-muted)] mb-3">Permanently deletes all your stored data — stats, activity, and account.</p>
+              <DeleteAccountButton />
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   )
