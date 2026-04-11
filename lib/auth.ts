@@ -23,6 +23,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   }),
   callbacks: {
     async signIn({ user }) {
+      // Only allow Juspay employees
+      if (!user.email?.endsWith('@juspay.in')) {
+        return false
+      }
+
       if (!user.id) return true
       // Provision user_stats row with sync_token on first login
       await supabaseAdmin
