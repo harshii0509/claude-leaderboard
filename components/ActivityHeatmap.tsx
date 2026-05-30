@@ -62,7 +62,8 @@ export default function ActivityHeatmap({ activity, days = 90 }: ActivityHeatmap
               <div
                 key={cell.date}
                 title={`${cell.date}: ${cell.tokens.toLocaleString()} tokens`}
-                className={`w-3 h-3 rounded-sm ${COLORS[intensity(cell.tokens, max)]}`}
+                className={`heatmap-cell w-3 h-3 rounded-sm ${COLORS[intensity(cell.tokens, max)]}`}
+                style={{ '--week-index': wi } as React.CSSProperties}
               />
             ))}
           </div>

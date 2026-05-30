@@ -1,8 +1,8 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/db'
-import Link from 'next/link'
 import CopyButton from './CopyButton'
+import SetupModal from './SetupModal'
 
 async function getSyncToken(userId: string): Promise<string | null> {
   // Provision row if it doesn't exist (fallback for users who pre-date the signIn callback)
@@ -27,43 +27,39 @@ export default async function SetupPage() {
   const installCmd = token ? `curl -fsSL ${appUrl}/api/install/${token} | bash` : null
 
   return (
-    <div className="min-h-screen bg-[var(--color-background)]">
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
-            ← Leaderboard
-          </Link>
-          <Link href="/profile" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
-            Profile
-          </Link>
-        </div>
-      </header>
+    <div
+      className="min-h-screen bg-[var(--color-background)]"
+      style={{
+        backgroundImage: `url('/bg.png')`,
+        backgroundRepeat: 'repeat',
+        backgroundSize: 'auto',
+      }}
+    >
+      <SetupModal>
+        {/* Description */}
+        <p className="text-sm text-[var(--color-muted)] leading-relaxed -mt-1">
+          Run the one-line command below to install the Claude Stop hook on your machine.
+          It will automatically sync your usage stats after every Claude session.
+        </p>
 
-      <main className="max-w-3xl mx-auto px-4 py-12 flex flex-col gap-8">
-        <div>
-          <h1 className="text-3xl font-bold text-[var(--color-text)] mb-2">Setup</h1>
-          <p className="text-[var(--color-muted)]">
-            Run the one-line command below to install the Claude Stop hook on your machine.
-            It will automatically sync your usage stats after every Claude session.
-          </p>
-        </div>
-
+        {/* Install command */}
         {installCmd ? (
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-3">Install command</p>
-            <div className="flex items-center gap-2 bg-[var(--color-surface-2)] rounded-lg px-4 py-3">
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold">Install command</p>
+            <div className="flex items-center gap-3 bg-[var(--color-surface-2)] rounded-[16px] px-4 py-3">
               <code className="flex-1 text-sm text-[var(--color-text)] font-mono break-all">{installCmd}</code>
               <CopyButton text={installCmd} />
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-[var(--color-muted)]">
+          <div className="bg-[var(--color-surface-2)] rounded-[16px] p-4 text-sm text-[var(--color-muted)]">
             Could not load your sync token. Please sign out and sign in again.
           </div>
         )}
 
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 flex flex-col gap-4">
-          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider">What the script does</p>
+        {/* What the script does */}
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold">What the script does</p>
           <ol className="list-decimal list-inside flex flex-col gap-2 text-sm text-[var(--color-muted)]">
             <li>Downloads <code className="text-[var(--color-text)] font-mono">sync.py</code> to <code className="text-[var(--color-text)] font-mono">~/.claude/</code></li>
             <li>Writes your personal sync token to <code className="text-[var(--color-text)] font-mono">~/.claude/sync_config.json</code></li>
@@ -74,7 +70,7 @@ export default async function SetupPage() {
             You can also run it manually at any time.
           </p>
         </div>
-      </main>
+      </SetupModal>
     </div>
   )
 }

@@ -21,11 +21,7 @@ export default function DeleteAccountButton() {
     <button
       onClick={handleClick}
       disabled={loading}
-      className={`text-sm px-4 py-2 rounded-lg border transition-colors disabled:opacity-50 ${
-        confirmed
-          ? 'border-red-500 bg-red-500 text-white hover:bg-red-600'
-          : 'border-[var(--color-border)] text-[var(--color-muted)] hover:border-red-500 hover:text-red-500'
-      }`}
+      className={`game-btn-red text-sm px-4 py-2 text-white font-bold disabled:opacity-50 ${confirmed ? 'opacity-90' : ''}`}
     >
       {loading
         ? 'Deleting…'

@@ -6,8 +6,8 @@ let _admin: SupabaseClient | null = null
 export function getSupabaseAnon(): SupabaseClient {
   if (!_anon) {
     _anon = createClient(
-      process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
-      process.env.SUPABASE_ANON_KEY || 'placeholder'
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!
     )
   }
   return _anon
@@ -16,8 +16,8 @@ export function getSupabaseAnon(): SupabaseClient {
 export function getSupabaseAdmin(): SupabaseClient {
   if (!_admin) {
     _admin = createClient(
-      process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
   }

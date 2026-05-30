@@ -1,10 +1,10 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Fredoka, Nunito } from 'next/font/google'
 import './globals.css'
 import Providers from '@/components/Providers'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
+const fredoka = Fredoka({ variable: '--font-fredoka', subsets: ['latin'], weight: ['400', '600'] })
+const nunito = Nunito({ variable: '--font-nunito', subsets: ['latin'], weight: ['700', '800'] })
 
 export const metadata: Metadata = {
   title: 'Claude Leaderboard',
@@ -13,8 +13,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="en" className={`${fredoka.variable} ${nunito.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col font-[family-name:var(--font-sans)]">
         <Providers>{children}</Providers>
       </body>
     </html>

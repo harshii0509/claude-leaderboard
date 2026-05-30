@@ -65,49 +65,87 @@ export default async function ProfilePage() {
 
   const totalModelCount = models.reduce((s, m) => s + m.count, 0) || 1
 
+  const status = syncStatus(stats?.last_synced_at ?? null)
+  const syncLabel = relativeTime(stats?.last_synced_at ?? null)
+
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
+      {/* Background texture */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `url('/bg.png')`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: 'auto',
+          opacity: 0.5,
+          mixBlendMode: 'overlay',
+          zIndex: 0,
+        }}
+      />
+
+      {/* Header */}
+      <header className="relative z-10 py-4 px-4">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <Link href="/" className="game-btn-ghost text-sm px-3 py-1.5 text-white font-bold">
             ← Leaderboard
           </Link>
-          <Link href="/setup" className="text-sm text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors">
+          <Link href="/setup" className="game-btn-ghost text-sm px-3 py-1.5 text-white font-bold">
             Setup
           </Link>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-8">
-        {/* User header */}
-        <div className="flex items-center gap-4">
-          {session.user.image ? (
-            <Image src={session.user.image} alt={session.user.name ?? ''} width={64} height={64} className="rounded-full" />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-[var(--color-accent)] flex items-center justify-center text-2xl font-bold text-white">
-              {session.user.name?.[0]?.toUpperCase()}
-            </div>
-          )}
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--color-text)]">{session.user.name}</h1>
-            <p className="text-sm text-[var(--color-muted)]">{session.user.email}</p>
-            {(() => {
-              const status = syncStatus(stats?.last_synced_at ?? null)
-              const label = relativeTime(stats?.last_synced_at ?? null)
-              const colors = {
-                green: 'bg-green-500/10 text-green-600 border-green-500/20',
-                yellow: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-                red: 'bg-red-500/10 text-red-500 border-red-500/20',
-              }
-              return (
-                <span className={`inline-flex items-center gap-1.5 mt-1.5 text-xs px-2 py-0.5 rounded-full border ${colors[status]}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${status === 'green' ? 'bg-green-500' : status === 'yellow' ? 'bg-yellow-500' : 'bg-red-500'}`} />
-                  {status === 'red' && !stats?.last_synced_at
-                    ? <><span>{label}</span> &mdash; <Link href="/setup" className="underline underline-offset-2">set up sync</Link></>
-                    : label}
-                </span>
-              )
-            })()}
+      <main className="relative z-10 max-w-3xl mx-auto px-4 pt-2 pb-12 flex flex-col gap-5">
+        {/* User card */}
+        <div className="game-card p-6 flex items-center gap-5">
+          <div className="avatar-ring rank-default flex-shrink-0">
+            {session.user.image ? (
+              <Image
+                src={session.user.image}
+                alt={session.user.name ?? ''}
+                width={64}
+                height={64}
+                className="game-avatar"
+              />
+            ) : (
+              <div className="game-avatar w-16 h-16 bg-[var(--color-accent)] flex items-center justify-center text-2xl font-bold text-white">
+                {session.user.name?.[0]?.toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <h1
+              className="text-2xl text-[var(--color-text)] leading-tight"
+              style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
+            >
+              {session.user.name}
+            </h1>
+            <p className="text-sm text-[var(--color-muted)] mt-0.5">{session.user.email}</p>
+
+            {/* Sync status chip */}
+            {status === 'red' ? (
+              <Link
+                href="/setup"
+                className="game-btn-red text-xs px-3 py-1 text-white font-bold mt-2"
+                style={{ borderRadius: '12px', boxShadow: '0px 3px 0px -1px #6B1E25' }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white/60 mr-1.5 inline-block flex-shrink-0" />
+                {!stats?.last_synced_at ? 'Never synced — set up sync' : syncLabel}
+              </Link>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 mt-2 text-xs px-3 py-1 text-white font-bold"
+                style={
+                  status === 'green'
+                    ? { background: '#22c55e', border: '2px solid #15803d', borderRadius: '12px', boxShadow: '0px 3px 0px -1px #15803d' }
+                    : { background: '#eab308', border: '2px solid #a16207', borderRadius: '12px', boxShadow: '0px 3px 0px -1px #a16207' }
+                }
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white/60 flex-shrink-0" />
+                {syncLabel}
+              </span>
+            )}
           </div>
         </div>
 
@@ -132,24 +170,24 @@ export default async function ProfilePage() {
             <StatCard label="Sessions" value={stats.total_sessions ?? 0} />
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 text-center">
-            <p className="text-[var(--color-muted)] mb-2">No stats yet.</p>
-            <Link href="/setup" className="text-[var(--color-accent)] text-sm hover:underline">
+          <div className="game-card p-6 text-center">
+            <p className="text-[var(--color-muted)] mb-3">No stats yet.</p>
+            <Link href="/setup" className="game-btn text-sm px-4 py-2 text-black font-bold">
               Set up the sync hook →
             </Link>
           </div>
         )}
 
         {/* Heatmap */}
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-4">Activity (90 days)</p>
+        <div className="game-card p-5">
+          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Activity (90 days)</p>
           <ActivityHeatmap activity={activity} days={90} />
         </div>
 
         {/* Model breakdown */}
         {models.length > 0 && (
-          <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-4">Models used</p>
+          <div className="game-card p-5">
+            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Models used</p>
             <div className="flex flex-col gap-3">
               {models.map((m) => {
                 const pct = Math.round((m.count / totalModelCount) * 100)
@@ -168,19 +206,20 @@ export default async function ProfilePage() {
             </div>
           </div>
         )}
+
         {/* Data & Privacy */}
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-4">Data &amp; Privacy</p>
+        <div className="game-card p-5">
+          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Data &amp; Privacy</p>
           <div className="flex flex-col gap-4">
             <div>
-              <p className="text-sm text-[var(--color-text)] font-medium mb-1">Uninstall the sync hook</p>
+              <p className="text-sm text-[var(--color-text)] font-semibold mb-1">Uninstall the sync hook</p>
               <ol className="list-decimal list-inside text-sm text-[var(--color-muted)] space-y-1">
                 <li>Remove the Stop hook entry for <code className="text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">sync_config.json</code> from <code className="text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">~/.claude/settings.json</code></li>
                 <li>Delete <code className="text-xs bg-[var(--color-surface-2)] px-1 py-0.5 rounded">~/.claude/sync_config.json</code></li>
               </ol>
             </div>
-            <div className="border-t border-[var(--color-border)] pt-4">
-              <p className="text-sm text-[var(--color-text)] font-medium mb-1">Delete account</p>
+            <div className="border-t border-[var(--color-surface-2)] pt-4">
+              <p className="text-sm text-[var(--color-text)] font-semibold mb-1">Delete account</p>
               <p className="text-sm text-[var(--color-muted)] mb-3">Permanently deletes all your stored data — stats, activity, and account.</p>
               <DeleteAccountButton />
             </div>

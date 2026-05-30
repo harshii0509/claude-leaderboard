@@ -25,6 +25,9 @@
 *.pem
 public/__pycache__/
 
+# data exports
+*.csv
+
 # debug
 npm-debug.log*
 yarn-debug.log*
@@ -40,3 +43,4 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.gstack/

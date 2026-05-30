@@ -49,36 +49,36 @@ export default function DetailPanel({ userId }: DetailPanelProps) {
   }, [userId])
 
   if (loading) {
-    return <div className="py-4 px-6 text-[var(--color-muted)] text-sm">Loading...</div>
+    return <div className="py-4 px-6 text-[var(--color-muted)] text-sm font-bold">Loading...</div>
   }
 
   const totalModelCount = models.reduce((s, m) => s + m.count, 0) || 1
 
   return (
-    <div className="px-6 py-4 bg-[var(--color-surface)] border-t border-[var(--color-border)] grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="px-6 py-4 bg-[var(--color-surface-2)] border-t border-[var(--color-border)]/15 grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
-        <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2">Activity (90 days)</p>
+        <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2 font-bold">Activity (90 days)</p>
         <ActivityHeatmap activity={activity} days={90} />
       </div>
       <div>
-        <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2">Models used</p>
+        <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2 font-bold">Models used</p>
         {models.length === 0 ? (
           <p className="text-sm text-[var(--color-muted)]">No data</p>
         ) : (
           <div className="flex flex-col gap-2">
-            {models.slice(0, 5).map((m) => {
+            {models.slice(0, 5).map((m, index) => {
               const pct = Math.round((m.count / totalModelCount) * 100)
               const shortName = m.model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
               return (
                 <div key={m.model} className="flex items-center gap-2 text-sm">
                   <span className="w-28 truncate text-[var(--color-muted)]" title={m.model}>{shortName}</span>
-                  <div className="flex-1 bg-[var(--color-surface-2)] rounded-full h-1.5">
+                  <div className="flex-1 bg-[var(--color-surface-2)] rounded-full h-1.5 overflow-hidden">
                     <div
-                      className="bg-[var(--color-accent)] h-1.5 rounded-full"
-                      style={{ width: `${pct}%` }}
+                      className="model-bar bg-[var(--color-accent)] h-1.5 rounded-full"
+                      style={{ width: `${pct}%`, '--bar-index': index } as React.CSSProperties}
                     />
                   </div>
-                  <span className="w-8 text-right text-[var(--color-muted)]">{pct}%</span>
+                  <span className="w-8 text-right text-[var(--color-muted)] tabular-nums">{pct}%</span>
                 </div>
               )
             })}

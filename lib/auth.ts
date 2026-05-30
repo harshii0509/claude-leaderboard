@@ -6,6 +6,7 @@ import { supabaseAdmin } from './db'
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: '/api/auth',
   trustHost: true,
+  pages: { error: '/' },
   logger: {
     error(error: Error) {
       console.error('[auth][debug]', error.message, (error as any).cause)
@@ -18,13 +19,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   adapter: SupabaseAdapter({
-    url: process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
+    url: process.env.SUPABASE_URL!,
+    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
   }),
   callbacks: {
     async signIn({ user }) {
-      // Only allow Juspay employees
-      if (!user.email?.endsWith('@juspay.in')) {
+      // If ALLOWED_EMAIL_DOMAIN is set, restrict sign-in to that domain only
+      const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN
+      if (allowedDomain && !user.email?.endsWith(`@${allowedDomain}`)) {
         return false
       }
 
