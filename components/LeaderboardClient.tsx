@@ -29,10 +29,12 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
   const top3 = entries.slice(0, 3)
 
   return (
-    <div className="flex flex-col gap-6">
-      {top3.length >= 1 && <Podium top3={top3} />}
-      <SortBar sort={sort} period={period} onSort={setSort} onPeriod={setPeriod} />
-      <RankingsTable entries={entries} sort={sort} />
+    <div className="flex flex-col">
+      {top3.length >= 1 && <Podium key={sort + period} top3={top3} />}
+      <div className="game-card card-enter card-enter-delay-300 p-5 flex flex-col gap-4 relative z-10 mt-3">
+        <SortBar sort={sort} period={period} onSort={setSort} onPeriod={setPeriod} />
+        <RankingsTable key={sort + period} entries={entries} sort={sort} />
+      </div>
     </div>
   )
 }

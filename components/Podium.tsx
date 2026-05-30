@@ -1,4 +1,8 @@
+'use client'
+
 import Image from 'next/image'
+import { useEffect } from 'react'
+import { playPodium } from '@/lib/audio'
 
 export interface LeaderboardEntry {
   user_id: string
@@ -22,9 +26,36 @@ interface PodiumProps {
 }
 
 const MEDALS = [
-  { label: '1st', color: 'var(--color-gold)', height: 'h-28', order: 1 },
-  { label: '2nd', color: 'var(--color-silver)', height: 'h-20', order: 0 },
-  { label: '3rd', color: 'var(--color-bronze)', height: 'h-16', order: 2 },
+  {
+    rank: 1,
+    bg: '#f5c842',
+    border: '#b8900a',
+    textColor: '#5a3c00',
+    blockHeight: 'h-28',
+    animClass: '',
+    podiumRiseClass: 'podium-rise podium-rise-delay-1',
+    ringClass: 'rank-1',
+  },
+  {
+    rank: 2,
+    bg: '#c8d4e0',
+    border: '#7a90a8',
+    textColor: '#2a3a4a',
+    blockHeight: 'h-20',
+    animClass: 'bounce-in-delay-1',
+    podiumRiseClass: 'podium-rise',
+    ringClass: 'rank-2',
+  },
+  {
+    rank: 3,
+    bg: '#c8844a',
+    border: '#8b5a2b',
+    textColor: '#fff',
+    blockHeight: 'h-16',
+    animClass: 'bounce-in-delay-2',
+    podiumRiseClass: 'podium-rise podium-rise-delay-2',
+    ringClass: 'rank-3',
+  },
 ]
 
 function fmt(n: number) {
@@ -34,42 +65,71 @@ function fmt(n: number) {
 }
 
 export default function Podium({ top3 }: PodiumProps) {
-  // Reorder: 2nd, 1st, 3rd
+  useEffect(() => {
+    const t = setTimeout(playPodium, 300)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Display order: 2nd (left), 1st (center), 3rd (right)
   const display = [top3[1], top3[0], top3[2]].filter(Boolean)
   const medalMap = [MEDALS[1], MEDALS[0], MEDALS[2]]
 
   return (
-    <div className="flex items-end justify-center gap-4 py-8">
+    <div className="flex items-end justify-center gap-3 pt-4 pb-0">
       {display.map((entry, i) => {
         const medal = medalMap[i]
         return (
-          <div key={entry.user_id} className="flex flex-col items-center gap-2 w-32">
-            {entry.image ? (
-              <Image
-                src={entry.image}
-                alt={entry.name}
-                width={56}
-                height={56}
-                className="rounded-full ring-2"
-                style={{ ringColor: medal.color } as React.CSSProperties}
-              />
-            ) : (
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold"
-                style={{ background: medal.color, color: '#0f0f13' }}
-              >
-                {entry.name[0]?.toUpperCase()}
+          <div key={entry.user_id} className="flex flex-col items-center w-32 relative">
+            {/* Stage spotlight — V-beam rising from podium base */}
+            <div className={`podium-spotlight ${medal.ringClass}`} />
+            {/* Avatar with spinning gradient ring */}
+            <div className={`avatar-ring ${medal.ringClass} mb-2 bounce-in ${medal.animClass} relative z-10`}>
+              <div className="game-avatar w-16 h-16">
+                {entry.image ? (
+                  <Image
+                    src={entry.image}
+                    alt={entry.name}
+                    width={64}
+                    height={64}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div
+                    className="w-full h-full flex items-center justify-center text-2xl font-extrabold"
+                    style={{ background: medal.bg, color: medal.textColor }}
+                  >
+                    {entry.name[0]?.toUpperCase()}
+                  </div>
+                )}
               </div>
-            )}
-            <div className="text-center">
-              <p className="text-sm font-semibold text-[var(--color-text)] truncate max-w-[7rem]">{entry.name}</p>
-              <p className="text-xs text-[var(--color-muted)]">{fmt(entry.total_tokens)} tokens</p>
             </div>
-            <div
-              className={`w-full ${medal.height} rounded-t-lg flex items-end justify-center pb-2`}
-              style={{ background: medal.color + '22', borderTop: `2px solid ${medal.color}` }}
+
+            {/* Name */}
+            <p
+              className="text-sm font-extrabold text-white text-center truncate max-w-[7rem] leading-tight relative z-10"
+              style={{ textShadow: '0 1px 0 rgba(0,0,50,0.25)' }}
             >
-              <span className="text-lg font-bold" style={{ color: medal.color }}>{medal.label}</span>
+              {entry.name.split(' ')[0]}
+            </p>
+            <p className="text-xs text-white/70 mb-2 text-center font-bold tabular-nums relative z-10">
+              {fmt(entry.total_tokens)}
+            </p>
+
+            {/* Podium block */}
+            <div
+              className={`w-full ${medal.blockHeight} podium-block ${medal.podiumRiseClass} flex flex-col items-center justify-end pb-2 relative z-10`}
+              style={{
+                background: medal.bg,
+                borderColor: medal.border,
+                boxShadow: `0 6px 0 -2px ${medal.border}`,
+              }}
+            >
+              <span
+                className="text-2xl leading-none tabular-nums font-[family-name:var(--font-display)]"
+                style={{ color: medal.textColor, fontWeight: 600 }}
+              >
+                {medal.rank}
+              </span>
             </div>
           </div>
         )
