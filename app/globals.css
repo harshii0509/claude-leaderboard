@@ -26,6 +26,7 @@
 body {
   background-color: var(--color-background);
   color: var(--color-text);
+  overscroll-behavior: none;
 }
 
 /* ── 3D Game Card ─────────────────────────────────── */
@@ -72,6 +73,38 @@ body {
 .game-btn:active {
   transform: translateY(3px);
   box-shadow: 0px 2px 0px -2px var(--color-accent-border);
+}
+
+/* ── Game Progress Bar ───────────────────────────── */
+.game-progress-track {
+  position: relative;
+  border: 2px solid var(--color-border);
+  border-radius: 99px;
+  background: var(--color-surface-2);
+  box-shadow: 0px 3px 0px -1px var(--color-border);
+  overflow: hidden;
+}
+.game-progress-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 2px -4px 0px 0px #bfd1e8;
+  pointer-events: none;
+  z-index: 2;
+}
+.game-progress-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 99px;
+}
+.game-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 2px -4px 0px 0px rgba(255, 255, 255, 0.28);
+  pointer-events: none;
 }
 
 /* ── Red Game Button ─────────────────────────────── */

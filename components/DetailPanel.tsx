@@ -55,7 +55,7 @@ export default function DetailPanel({ userId }: DetailPanelProps) {
   const totalModelCount = models.reduce((s, m) => s + m.count, 0) || 1
 
   return (
-    <div className="px-6 py-4 bg-[var(--color-surface-2)] border-t border-[var(--color-border)]/15 grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="px-6 py-4 bg-[var(--color-surface-2)] border-t border-[var(--color-border)]/15 flex flex-col gap-6">
       <div>
         <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2 font-bold">Activity (90 days)</p>
         <ActivityHeatmap activity={activity} days={90} />
@@ -72,9 +72,9 @@ export default function DetailPanel({ userId }: DetailPanelProps) {
               return (
                 <div key={m.model} className="flex items-center gap-2 text-sm">
                   <span className="w-28 truncate text-[var(--color-muted)]" title={m.model}>{shortName}</span>
-                  <div className="flex-1 bg-[var(--color-surface-2)] rounded-full h-1.5 overflow-hidden">
+                  <div className="game-progress-track flex-1 h-4">
                     <div
-                      className="model-bar bg-[var(--color-accent)] h-1.5 rounded-full"
+                      className="game-progress-fill model-bar bg-[var(--color-accent)]"
                       style={{ width: `${pct}%`, '--bar-index': index } as React.CSSProperties}
                     />
                   </div>
