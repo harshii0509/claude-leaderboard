@@ -14,7 +14,7 @@ Claude Leaderboard is a self-hosted Next.js app backed by Supabase.
 
 At a high level:
 
-1. Users sign in with Google.
+1. Users sign in with Google or GitHub.
 2. Each user gets a one-line Setup command from `/setup`.
 3. That installer writes a local `sync.py` script plus a personal sync credential.
 4. Claude Code Stop hooks run the script after each session.
@@ -26,7 +26,7 @@ The golden path for the first public version is:
 
 - app hosting: Vercel
 - database/auth/storage: Supabase
-- user auth: Google OAuth
+- user auth: Google OAuth by default, with optional GitHub OAuth support
 
 That is the path the repo is optimized for today.
 
@@ -36,7 +36,9 @@ If you do not want to use Vercel, the repo now also includes a production `Docke
 
 - Node.js 18+
 - a Supabase project
-- a Google Cloud OAuth client
+- at least one OAuth provider:
+- a Google Cloud OAuth client, and/or
+- a GitHub OAuth app
 - a public app URL for your deployment
 
 ## Quick start
@@ -144,6 +146,8 @@ The container uses:
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-side admin access for auth, sync, and admin commands |
 | `GOOGLE_CLIENT_ID` | Google sign-in |
 | `GOOGLE_CLIENT_SECRET` | Google sign-in |
+| `GITHUB_CLIENT_ID` | GitHub sign-in |
+| `GITHUB_CLIENT_SECRET` | GitHub sign-in |
 | `AUTH_SECRET` | Session encryption for NextAuth |
 | `NEXT_PUBLIC_APP_URL` | Generates install commands and callback URLs |
 | `ALLOWED_EMAIL_DOMAIN` | Optional single-domain restriction |
@@ -155,6 +159,14 @@ In Google Cloud:
 1. Create an OAuth 2.0 Client ID for a web app.
 2. Add your app URL to authorized JavaScript origins.
 3. Add `https://your-domain.com/api/auth/callback/google` to redirect URIs.
+
+## GitHub OAuth checklist
+
+In GitHub Developer Settings:
+
+1. Create an OAuth App.
+2. Set the homepage URL to your app URL.
+3. Add `https://your-domain.com/api/auth/callback/github` as the callback URL.
 
 ## First-time operator flow
 
@@ -212,7 +224,7 @@ Clears leaderboard data while preserving users.
 
 These are intentional constraints for the current open-source shape:
 
-- Google is the only supported sign-in provider today.
+- Google is the default sign-in provider and GitHub is the supported optional second provider today.
 - Supabase is the only supported backend today.
 - The installer is optimized for macOS/Linux shell environments.
 - Multi-tenant SaaS is out of scope for this repo right now.
@@ -223,8 +235,8 @@ If you want to keep pushing this as an OSS project, the next sensible steps are:
 
 1. Add a Supabase CLI-driven migration workflow around `supabase/migrations/`.
 2. Add focused tests around leaderboard math and sync ingestion.
-3. Add GitHub auth as an optional second provider.
-4. Publish screenshots and a demo dataset for easier evaluation.
+3. Publish screenshots and a demo dataset for easier evaluation.
+4. Consider invite-based access controls if teams want looser domain restrictions with GitHub sign-in.
 
 ## Design principle
 

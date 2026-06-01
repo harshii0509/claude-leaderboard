@@ -1,8 +1,16 @@
 import NextAuth from 'next-auth'
-import Google from 'next-auth/providers/google'
 import { SupabaseAdapter } from '@auth/supabase-adapter'
 import { supabaseAdmin } from './db'
 import { ensureSyncCredential } from './sync-auth'
+import { getEnabledAuthProviders } from './auth-providers'
+
+const providers = getEnabledAuthProviders()
+
+if (providers.length === 0) {
+  throw new Error(
+    'No auth providers configured. Set Google or GitHub OAuth environment variables before starting the app.',
+  )
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: '/api/auth',
@@ -13,12 +21,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       console.error('[auth][debug]', error.message, error.cause)
     },
   },
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
+  providers,
   adapter: SupabaseAdapter({
     url: process.env.SUPABASE_URL!,
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,

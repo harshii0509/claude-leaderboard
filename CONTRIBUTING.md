@@ -10,8 +10,10 @@ This project is maintained as a self-hosted open-source app, while also powering
 2. Install dependencies: `npm install`
 3. Copy `.env.example` to `.env.local` and fill in your values (see README for setup guides)
 4. Validate your config: `set -a && source .env.local && npm run validate:env`
-5. Run the Supabase migration in `supabase-migration.sql` against your project
+5. Apply the preferred schema files in `supabase/migrations/`, or use `supabase-migration.sql` if you want the compatibility snapshot path
 6. Start the dev server: `npm run dev`
+
+At least one auth provider must be configured locally. Google is the default path; GitHub is optional.
 
 For the full operator path, see [docs/self-hosting.md](docs/self-hosting.md).
 

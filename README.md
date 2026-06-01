@@ -92,11 +92,15 @@ If you want to self-host outside Vercel, this repo also supports a Docker-based 
 | `SUPABASE_URL` | Yes | Your Supabase project URL |
 | `SUPABASE_ANON_KEY` | Yes | Supabase anonymous/public key |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase service role key (server-side only) |
-| `GOOGLE_CLIENT_ID` | Yes | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Yes | Google OAuth client secret |
+| `GOOGLE_CLIENT_ID` | Conditionally | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Conditionally | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | Conditionally | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | Conditionally | GitHub OAuth client secret |
 | `AUTH_SECRET` | Yes | Random secret for NextAuth session encryption (`openssl rand -base64 32`) |
 | `NEXT_PUBLIC_APP_URL` | Yes | Public URL of your deployment (no trailing slash) |
 | `ALLOWED_EMAIL_DOMAIN` | No | If set, only emails ending with this domain can sign in (e.g. `yourcompany.com`) |
+
+At least one auth provider must be configured. Google remains the default path used by the current live deployment, and GitHub is available as an optional second provider for self-hosted teams.
 
 ### Google OAuth setup
 
@@ -104,6 +108,13 @@ If you want to self-host outside Vercel, this repo also supports a Docker-based 
 2. Create an OAuth 2.0 Client ID (Web application)
 3. Add your domain to **Authorized JavaScript origins**
 4. Add `https://yourdomain.com/api/auth/callback/google` to **Authorized redirect URIs**
+
+### GitHub OAuth setup
+
+1. Go to [GitHub Developer Settings](https://github.com/settings/developers)
+2. Create a new OAuth App
+3. Set the homepage URL to your app URL
+4. Set the callback URL to `https://yourdomain.com/api/auth/callback/github`
 
 ## How it works
 

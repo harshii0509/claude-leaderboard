@@ -4,13 +4,17 @@ const required = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'GOOGLE_CLIENT_ID',
-  'GOOGLE_CLIENT_SECRET',
   'AUTH_SECRET',
   'NEXT_PUBLIC_APP_URL',
 ]
 
-const optional = ['ALLOWED_EMAIL_DOMAIN']
+const optional = [
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GITHUB_CLIENT_ID',
+  'GITHUB_CLIENT_SECRET',
+  'ALLOWED_EMAIL_DOMAIN',
+]
 
 function isPlaceholder(value) {
   if (!value) return true
@@ -40,6 +44,18 @@ for (const key of required) {
   if (!value || isPlaceholder(value)) {
     missing.push(key)
   }
+}
+
+const hasGoogle =
+  Boolean(process.env.GOOGLE_CLIENT_ID && !isPlaceholder(process.env.GOOGLE_CLIENT_ID)) &&
+  Boolean(process.env.GOOGLE_CLIENT_SECRET && !isPlaceholder(process.env.GOOGLE_CLIENT_SECRET))
+
+const hasGitHub =
+  Boolean(process.env.GITHUB_CLIENT_ID && !isPlaceholder(process.env.GITHUB_CLIENT_ID)) &&
+  Boolean(process.env.GITHUB_CLIENT_SECRET && !isPlaceholder(process.env.GITHUB_CLIENT_SECRET))
+
+if (!hasGoogle && !hasGitHub) {
+  missing.push('At least one auth provider: configure Google or GitHub OAuth credentials')
 }
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL

@@ -6,6 +6,7 @@ import SignOutButton from '@/components/SignOutButton'
 import SignInButton from '@/components/SignInButton'
 import ErrorToast from '@/components/ErrorToast'
 import { getLeaderboardData } from '@/lib/leaderboard'
+import { getEnabledAuthProviderOptions } from '@/lib/auth-providers'
 
 export default async function HomePage({
   searchParams,
@@ -20,6 +21,7 @@ export default async function HomePage({
       .then((data) => ({ data, failed: false }))
       .catch(() => ({ data: [], failed: true })),
   ])
+  const authProviders = getEnabledAuthProviderOptions()
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -63,7 +65,7 @@ export default async function HomePage({
                 <SignOutButton />
               </>
             ) : (
-              <SignInButton />
+              <SignInButton providers={authProviders} />
             )}
             <AudioToggle />
           </nav>
