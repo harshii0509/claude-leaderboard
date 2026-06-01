@@ -33,3 +33,9 @@ Typical flow:
 supabase link --project-ref <your-project-ref>
 npm run db:push
 ```
+
+## Demo data
+
+For evaluation environments, see `supabase/seed/demo.sql`.
+
+That file seeds synthetic users and raw usage events, then rebuilds the derived leaderboard tables through the normal rollup pipeline.

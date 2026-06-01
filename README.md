@@ -75,6 +75,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 For a more detailed self-hosting walkthrough, see [docs/self-hosting.md](docs/self-hosting.md).
 
+If you want to evaluate the app without onboarding a real team first, there is also a demo seed at `supabase/seed/demo.sql`.
+
 ## Deployment
 
 The easiest way to deploy is Vercel:
@@ -226,6 +228,19 @@ docker run --rm -p 3000:3000 --env-file .env.local claude-leaderboard
 ```
 
 For the full container-oriented flow and operator notes, see [docs/self-hosting.md](docs/self-hosting.md).
+
+## Demo dataset
+
+For evaluation environments, the repo includes a synthetic demo seed at `supabase/seed/demo.sql`.
+
+It inserts sample users plus raw usage events, then rebuilds the leaderboard through the same rollup path the real product uses. This gives self-hosters a quick way to explore:
+
+- the homepage leaderboard
+- profile modals
+- activity heatmaps
+- streak behavior
+
+Use it for local or staging-style demos, not for a real production deployment.
 
 ## Contributing
 

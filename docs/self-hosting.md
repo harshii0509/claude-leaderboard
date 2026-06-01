@@ -187,6 +187,21 @@ For each teammate:
 3. They run the one-line install command.
 4. Claude begins auto-syncing after each session.
 
+## Demo / evaluation mode
+
+If you want to understand the product before rolling it out to a real team, use the demo seed in `supabase/seed/demo.sql`.
+
+It creates synthetic users and synthetic raw usage events, then rebuilds the leaderboard through `refresh_all_leaderboard_rollups()`.
+
+That gives you a populated environment for:
+
+- leaderboard ranking
+- streak display
+- profile modal details
+- activity heatmaps
+
+Use it only for local or evaluation setups, not real production environments.
+
 If you ever change scoring logic or need to replay history:
 
 1. `npm run leaderboard:rescan`
