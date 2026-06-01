@@ -76,6 +76,15 @@ Apply them in filename order:
 
 You can run them in the Supabase SQL editor one by one, or use your preferred migration workflow around that folder.
 
+If you prefer the Supabase CLI, this repo includes a minimal workflow:
+
+```bash
+supabase link --project-ref <your-project-ref>
+npm run db:push
+```
+
+That command uses `scripts/supabase-db-push.sh`, which simply runs `supabase db push --workdir supabase`.
+
 `supabase-migration.sql` is still kept at the repo root as a compatibility snapshot if you want the older one-shot setup path.
 
 This creates:

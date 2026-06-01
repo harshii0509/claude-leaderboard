@@ -24,6 +24,7 @@
     "test": "node --experimental-strip-types --test tests/**/*.test.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "validate:env": "node scripts/validate-env.mjs",
+    "db:push": "bash ./scripts/supabase-db-push.sh",
     "leaderboard:status": "node scripts/leaderboard-admin.mjs status",
     "leaderboard:rescan": "node scripts/leaderboard-admin.mjs rescan",
     "leaderboard:rebuild": "node scripts/leaderboard-admin.mjs rebuild",

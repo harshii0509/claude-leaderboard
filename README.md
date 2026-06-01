@@ -58,6 +58,13 @@ For new self-hosted setups, apply the ordered SQL files in `supabase/migrations/
 
 If you prefer the old one-shot flow, you can still run `supabase-migration.sql` as a compatibility snapshot.
 
+If you use the Supabase CLI, the repo now includes a thin workflow for the migration folder:
+
+```bash
+supabase link --project-ref <your-project-ref>
+npm run db:push
+```
+
 ### 4. Start the dev server
 
 ```bash

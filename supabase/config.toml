@@ -1,0 +1,12 @@
+# Local-first Supabase CLI config for self-hosted development.
+# Teams can link this repo to their own Supabase project with:
+#
+#   supabase link --project-ref <your-project-ref>
+#
+# After linking, they can apply the ordered SQL files in `supabase/migrations/`
+# using the CLI workflow documented in README.md and docs/self-hosting.md.
+
+project_id = "your-project-ref"
+
+[db]
+major_version = 17

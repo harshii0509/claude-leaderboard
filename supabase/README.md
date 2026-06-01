@@ -18,3 +18,18 @@ These files are designed for teams who want a more maintainable migration story 
 The repository still keeps `supabase-migration.sql` at the repo root as a compatibility snapshot for the current setup flow and for teams that prefer a single-file bootstrap.
 
 If you are setting this project up for the first time, prefer the ordered files in `supabase/migrations/`.
+
+## CLI workflow
+
+This repo now includes:
+
+- `supabase/config.toml`
+- `npm run db:push`
+- `scripts/supabase-db-push.sh`
+
+Typical flow:
+
+```bash
+supabase link --project-ref <your-project-ref>
+npm run db:push
+```
