@@ -10,18 +10,29 @@ import UserProfileModal from './UserProfileModal'
 type Sort = 'tokens' | 'messages' | 'streak'
 type Period = '7d' | '30d' | 'all'
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+async function fetcher(url: string) {
+  const response = await fetch(url)
+  const payload = await response.json()
+
+  if (!response.ok) {
+    const message = payload && typeof payload.error === 'string' ? payload.error : 'Failed to load leaderboard'
+    throw new Error(message)
+  }
+
+  return payload
+}
 
 interface LeaderboardClientProps {
   initialData: LeaderboardEntry[]
+  initialLoadFailed?: boolean
 }
 
-export default function LeaderboardClient({ initialData }: LeaderboardClientProps) {
+export default function LeaderboardClient({ initialData, initialLoadFailed = false }: LeaderboardClientProps) {
   const [sort, setSort] = useState<Sort>('tokens')
   const [period, setPeriod] = useState<Period>('all')
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null)
 
-  const { data } = useSWR<LeaderboardEntry[]>(
+  const { data, error, isLoading } = useSWR<LeaderboardEntry[]>(
     `/api/leaderboard?sort=${sort}&period=${period}`,
     fetcher,
     { fallbackData: initialData, refreshInterval: 60_000 }
@@ -29,18 +40,31 @@ export default function LeaderboardClient({ initialData }: LeaderboardClientProp
 
   const entries = Array.isArray(data) ? data : []
   const top3 = entries.slice(0, 3)
+  const hasError = Boolean(error) || initialLoadFailed
+  const showEmpty = !isLoading && entries.length === 0
+  const errorMessage = error instanceof Error ? error.message : 'Leaderboard data is temporarily unavailable.'
 
   return (
     <div className="flex flex-col">
+      {hasError && (
+        <div className="game-card p-4 mb-3 border border-[var(--color-red)]/30 bg-[var(--color-red)]/10 text-sm text-[var(--color-text)]">
+          Leaderboard data could not be refreshed right now. {errorMessage}
+        </div>
+      )}
       {top3.length >= 1 && <Podium key={sort + period} top3={top3} />}
       <div className="game-card card-enter card-enter-delay-300 p-5 flex flex-col gap-4 relative z-10 mt-3">
         <SortBar sort={sort} period={period} onSort={setSort} onPeriod={setPeriod} />
-        <RankingsTable
-          key={sort + period}
-          entries={entries}
-          sort={sort}
-          onUserClick={setSelectedUser}
-        />
+        {showEmpty ? (
+          <div className="rounded-[16px] bg-[var(--color-surface-2)] px-4 py-6 text-center text-sm text-[var(--color-muted)]">
+            No leaderboard data is available yet.
+          </div>
+        ) : (
+          <RankingsTable
+            key={sort + period}
+            entries={entries}
+            onUserClick={setSelectedUser}
+          />
+        )}
       </div>
       {selectedUser && (
         <UserProfileModal

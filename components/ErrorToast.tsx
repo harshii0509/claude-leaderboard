@@ -7,29 +7,21 @@ const MESSAGES: Record<string, string> = {
   Default: 'Something went wrong. Please try again.',
 }
 
-export default function ErrorToast({ error }: { error?: string | null }) {
-  const [visible, setVisible] = useState(false)
+function ToastBody({ error }: { error: string }) {
   const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
-    if (!error) return
-    setVisible(true)
-    setLeaving(false)
     playError()
     const dismiss = setTimeout(() => {
       setLeaving(true)
-      setTimeout(() => setVisible(false), 200)
     }, 4000)
     return () => clearTimeout(dismiss)
   }, [error])
-
-  if (!visible) return null
-
-  const message = MESSAGES[error ?? ''] ?? MESSAGES.Default
+  
+  const message = MESSAGES[error] ?? MESSAGES.Default
 
   function dismiss() {
     setLeaving(true)
-    setTimeout(() => setVisible(false), 200)
   }
 
   return (
@@ -62,4 +54,9 @@ export default function ErrorToast({ error }: { error?: string | null }) {
       </div>
     </div>
   )
+}
+
+export default function ErrorToast({ error }: { error?: string | null }) {
+  if (!error) return null
+  return <ToastBody key={error} error={error} />
 }

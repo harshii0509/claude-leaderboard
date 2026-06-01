@@ -8,16 +8,28 @@
     "type": "git",
     "url": "https://github.com/harshii0509/claude-leaderboard"
   },
-  "keywords": ["claude", "leaderboard", "ai", "team", "nextjs", "supabase"],
+  "keywords": [
+    "claude",
+    "leaderboard",
+    "ai",
+    "team",
+    "nextjs",
+    "supabase"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "leaderboard:status": "node scripts/leaderboard-admin.mjs status",
+    "leaderboard:rescan": "node scripts/leaderboard-admin.mjs rescan",
+    "leaderboard:rebuild": "node scripts/leaderboard-admin.mjs rebuild",
+    "leaderboard:reset": "node scripts/leaderboard-admin.mjs reset"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.1",
     "@supabase/supabase-js": "^2.100.0",
+    "framer-motion": "^12.40.0",
     "next": "16.2.1",
     "next-auth": "^5.0.0-beta.30",
     "react": "19.2.4",

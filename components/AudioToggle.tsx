@@ -1,12 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { getMuted, setMuted } from '@/lib/audio'
 
 export default function AudioToggle() {
-  const [muted, setMutedState] = useState(false)
-
-  useEffect(() => { setMutedState(getMuted()) }, [])
+  const [muted, setMutedState] = useState(() => getMuted())
 
   const toggle = () => {
     const next = !muted

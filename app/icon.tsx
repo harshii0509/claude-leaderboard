@@ -15,7 +15,23 @@ export default function Icon() {
         justifyContent: 'center',
       }}
     >
-      🥇
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#F5A623',
+          borderRadius: '50%',
+          color: 'white',
+          fontWeight: 'bold',
+          fontFamily: 'sans-serif',
+          fontSize: 16,
+        }}
+      >
+        1
+      </div>
     </div>,
     { ...size }
   )

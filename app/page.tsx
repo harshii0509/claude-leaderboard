@@ -14,7 +14,12 @@ export default async function HomePage({
 }) {
   const params = await searchParams
   const errorCode = typeof params?.error === 'string' ? params.error : null
-  const [session, initialData] = await Promise.all([auth(), getLeaderboardData('tokens', 'all').catch(() => [])])
+  const [session, leaderboardResult] = await Promise.all([
+    auth(),
+    getLeaderboardData('tokens', 'all')
+      .then((data) => ({ data, failed: false }))
+      .catch(() => ({ data: [], failed: true })),
+  ])
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -66,7 +71,7 @@ export default async function HomePage({
       </header>
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 pb-12">
-        <LeaderboardClient initialData={initialData} />
+        <LeaderboardClient initialData={leaderboardResult.data} initialLoadFailed={leaderboardResult.failed} />
       </main>
       <ErrorToast error={errorCode} />
     </div>

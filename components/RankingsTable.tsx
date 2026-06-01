@@ -1,12 +1,12 @@
 'use client'
 
 import Image from 'next/image'
+import { motion, useReducedMotion } from 'framer-motion'
 import { LeaderboardEntry } from './Podium'
 import { playHover } from '@/lib/audio'
 
 interface RankingsTableProps {
   entries: LeaderboardEntry[]
-  sort: 'tokens' | 'messages' | 'streak'
   onUserClick: (entry: LeaderboardEntry) => void
 }
 
@@ -28,7 +28,24 @@ const RING_CLASS: Record<number, string> = {
   3: 'rank-3',
 }
 
-export default function RankingsTable({ entries, sort, onUserClick }: RankingsTableProps) {
+const tableVariants = {
+  show: { transition: { staggerChildren: 0.03, delayChildren: 0.04 } },
+}
+
+const rowVariants = {
+  hidden: { opacity: 0, y: 10 },
+  show: (reduce: boolean) => ({
+    opacity: 1,
+    y: 0,
+    transition: reduce
+      ? { duration: 0 }
+      : { type: 'spring' as const, duration: 0.32, bounce: 0.2 },
+  }),
+}
+
+export default function RankingsTable({ entries, onUserClick }: RankingsTableProps) {
+  const shouldReduce = useReducedMotion() ?? false
+
   return (
     <div className="overflow-hidden rounded-2xl border border-[var(--color-border)]/15">
       <table className="w-full text-sm">
@@ -42,16 +59,18 @@ export default function RankingsTable({ entries, sort, onUserClick }: RankingsTa
             <th className="text-right px-4 py-3 text-[var(--color-muted)] font-bold">Streak</th>
           </tr>
         </thead>
-        <tbody>
+        <motion.tbody variants={tableVariants} initial="hidden" animate="show">
           {entries.map((entry, idx) => {
             const rank = idx + 1
             const badge = RANK_BADGE[rank]
             const ringClass = RING_CLASS[rank] ?? 'rank-default'
             return (
-              <tr
+              <motion.tr
                 key={entry.user_id}
-                className="row-enter border-b border-[var(--color-border)]/10 hover:bg-[var(--color-surface-2)] cursor-pointer transition-colors"
-                style={{ '--row-index': idx } as React.CSSProperties}
+                variants={rowVariants}
+                custom={shouldReduce}
+                whileHover={shouldReduce ? {} : { x: 3 }}
+                className="border-b border-[var(--color-border)]/10 hover:bg-[var(--color-surface-2)] cursor-pointer transition-colors"
                 onMouseEnter={playHover}
                 onClick={() => onUserClick(entry)}
               >
@@ -98,13 +117,17 @@ export default function RankingsTable({ entries, sort, onUserClick }: RankingsTa
                 <td className="px-4 py-3 text-right">
                   {entry.current_streak > 0 ? (
                     <span className="text-[var(--color-gold)] font-bold tabular-nums">
-                      <span className="streak-fire">🔥</span> {entry.current_streak}d
+                      <span className="streak-fire">
+                        <svg width="11" height="13" viewBox="0 0 12 14" fill="none" aria-hidden="true">
+                          <path d="M6 0C6 0 9 4 9 7a3 3 0 01-6 0c0-1.5 1-3 1-3S5 5.5 5 7a1 1 0 002 0C7 5 6 0 6 0z" fill="#F5A623"/>
+                        </svg>
+                      </span>{' '}{entry.current_streak}d
                     </span>
                   ) : (
                     <span className="text-[var(--color-muted)]">—</span>
                   )}
                 </td>
-              </tr>
+              </motion.tr>
             )
           })}
           {entries.length === 0 && (
@@ -114,7 +137,7 @@ export default function RankingsTable({ entries, sort, onUserClick }: RankingsTa
               </td>
             </tr>
           )}
-        </tbody>
+        </motion.tbody>
       </table>
     </div>
   )

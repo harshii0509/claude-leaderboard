@@ -2,14 +2,15 @@ import NextAuth from 'next-auth'
 import Google from 'next-auth/providers/google'
 import { SupabaseAdapter } from '@auth/supabase-adapter'
 import { supabaseAdmin } from './db'
+import { ensureSyncCredential } from './sync-auth'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: '/api/auth',
   trustHost: true,
   pages: { error: '/' },
   logger: {
-    error(error: Error) {
-      console.error('[auth][debug]', error.message, (error as any).cause)
+    error(error: Error & { cause?: unknown }) {
+      console.error('[auth][debug]', error.message, error.cause)
     },
   },
   providers: [
@@ -31,10 +32,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (!user.id) return true
-      // Provision user_stats row with sync_token on first login
       await supabaseAdmin
         .from('user_stats')
         .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true })
+      await ensureSyncCredential(user.id)
       return true
     },
     async session({ session, user }) {

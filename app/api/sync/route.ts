@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
-import { supabaseAdmin } from '@/lib/db'
-import { syncUserStats, SyncPayload } from '@/lib/sync'
+import { getUserIdForSyncToken } from '@/lib/sync-auth'
+import { syncUserStats, validateSyncPayload } from '@/lib/sync'
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization') ?? ''
@@ -10,17 +10,19 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Missing Bearer token' }, { status: 401 })
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('user_stats')
-    .select('user_id')
-    .eq('sync_token', token)
-    .single()
+  let userId: string | null = null
+  try {
+    userId = await getUserIdForSyncToken(token)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return Response.json({ error: message }, { status: 500 })
+  }
 
-  if (error || !data) {
+  if (!userId) {
     return Response.json({ error: 'Invalid token' }, { status: 401 })
   }
 
-  let payload: SyncPayload
+  let payload: unknown
   try {
     payload = await request.json()
   } catch {
@@ -28,10 +30,18 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await syncUserStats(data.user_id, payload)
-    return Response.json({ ok: true })
+    const validated = validateSyncPayload(payload)
+    const result = await syncUserStats(userId, validated)
+    return Response.json({
+      ok: true,
+      inserted_events: result.insertedEvents,
+      sync_generation: result.syncGeneration,
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    const status = message.startsWith('Invalid ') || message.startsWith('Unsupported ') || message.startsWith('Too many ')
+      ? 400
+      : 500
+    return Response.json({ error: message }, { status })
   }
 }

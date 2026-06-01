@@ -1,22 +1,36 @@
 import { NextRequest } from 'next/server'
+import { consumeInstallToken } from '@/lib/sync-auth'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.nextUrl.origin
+  let syncToken: string | null = null
+  try {
+    syncToken = await consumeInstallToken(token)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    return Response.json({ error: message }, { status: 500 })
+  }
+
+  if (!syncToken) {
+    return Response.json({ error: 'Invalid or expired install token' }, { status: 404 })
+  }
 
   const script = `#!/usr/bin/env bash
 set -euo pipefail
 
-SYNC_TOKEN="${token}"
+SYNC_TOKEN="${syncToken}"
 APP_URL="${appUrl}"
 CLAUDE_DIR="$HOME/.claude"
 SYNC_SCRIPT="$CLAUDE_DIR/sync.py"
 CONFIG_FILE="$CLAUDE_DIR/sync_config.json"
+SETTINGS="$CLAUDE_DIR/settings.json"
 
 echo "Installing Claude Leaderboard sync..."
+mkdir -p "$CLAUDE_DIR"
 
 # Download sync script
 curl -fsSL "$APP_URL/sync.py" -o "$SYNC_SCRIPT"
@@ -26,12 +40,12 @@ chmod +x "$SYNC_SCRIPT"
 cat > "$CONFIG_FILE" <<EOF
 {
   "sync_token": "$SYNC_TOKEN",
-  "api_url": "$APP_URL/api/sync"
+  "api_url": "$APP_URL/api/sync",
+  "schema_version": 2
 }
 EOF
 
 # Add Stop hook to Claude settings (idempotent)
-SETTINGS="$CLAUDE_DIR/settings.json"
 if [ ! -f "$SETTINGS" ]; then
   echo '{}' > "$SETTINGS"
 fi

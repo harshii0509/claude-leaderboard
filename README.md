@@ -1,6 +1,6 @@
 # Claude Leaderboard
 
-A self-hosted leaderboard for tracking your team's [Claude Code](https://claude.ai/code) usage. Team members sign in, install a one-line sync hook, and their Claude Code activity is automatically aggregated and displayed on a shared leaderboard.
+A self-hosted leaderboard for tracking your team's [Claude Code](https://claude.ai/code) and Codex usage. Team members sign in, install a one-line sync hook, and their local AI coding activity is aggregated and displayed on a shared leaderboard.
 
 <!-- Add a screenshot here once designs are finalized -->
 
@@ -9,7 +9,7 @@ A self-hosted leaderboard for tracking your team's [Claude Code](https://claude.
 - **Team leaderboard** — rank members by tokens, messages, or streak
 - **Podium view** — spotlight your top 3 contributors
 - **Activity heatmap** — 90-day GitHub-style heatmap per user
-- **Model breakdown** — see which Claude models each person uses
+- **Model breakdown** — see which Claude and Codex models each person uses
 - **Streak tracking** — current and longest usage streaks
 - **Auto-sync** — a Claude Code hook pushes stats automatically after every session
 - **Domain restriction** — optionally lock sign-in to your company email domain
@@ -83,8 +83,70 @@ After deploying, add your environment variables in the Vercel dashboard under **
 
 1. Users sign in with Google and visit the **Setup** page
 2. They run a one-line curl command that installs a Python sync script and registers a Claude Code `Stop` hook on their machine
-3. After every Claude Code session, the hook runs `sync.py`, which parses local JSONL usage logs from `~/.claude/projects/` and POSTs aggregated stats to your deployment
-4. The leaderboard updates automatically
+3. The installer exchanges a short-lived install token for that user's long-lived sync credential and stores it locally in `~/.claude/sync_config.json`
+4. After every Claude Code session, the hook runs `sync.py`, which incrementally parses new finalized usage events from `~/.claude/projects/` and Codex turn telemetry from `~/.codex/logs_2.sqlite`, then POSTs raw events to your deployment
+5. The server validates those events, stores them idempotently, and computes the official leaderboard totals, streaks, sessions, and model breakdowns
+6. The leaderboard updates automatically
+
+## Scoring model
+
+The leaderboard score is based on total Claude and Codex usage tokens:
+
+- `input_tokens`
+- `output_tokens`
+- `cache_creation_input_tokens`
+- `cache_read_input_tokens`
+
+Messages are counted from finalized Claude assistant usage events and Codex turns with token telemetry. Sessions are counted from distinct Claude session IDs and Codex thread IDs. Longest streak is rolled up from historical daily activity, while current streak is computed live from `daily_activity` so it decays correctly even when a user has stopped syncing.
+
+## Operator commands
+
+These commands require `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`, plus `SUPABASE_SERVICE_ROLE_KEY`.
+
+```bash
+npm run leaderboard:status
+```
+
+Shows the current sync generation plus which users have not yet repopulated raw-event history after a migration or global rescan.
+
+There is also an authenticated in-app status page at `/admin/leaderboard`.
+
+```bash
+npm run leaderboard:rebuild
+```
+
+Rebuilds derived leaderboard tables from the raw event ledger without deleting users.
+
+```bash
+npm run leaderboard:rescan
+```
+
+Bumps the server sync generation so every installed client rescans its full local history on the next sync. Use this after a scoring migration or partial backfill issue.
+
+```bash
+npm run leaderboard:reset
+```
+
+Destructively clears stored leaderboard data, preserves users, and bumps sync generation so clients can repopulate from scratch. Use this only when you intentionally want a fresh season or a full replay.
+
+## Upgrade existing installs
+
+If your team already installed an older version of the sync hook, they should rerun the **Setup** command once.
+
+That refresh does three things:
+
+- installs the new incremental `sync.py`
+- switches them to the new raw-event sync contract
+- adds Codex usage collection if `~/.codex/logs_2.sqlite` is present
+- re-registers the automatic Claude `Stop` hook if needed
+
+After that one-time reinstall, syncing continues automatically after each Claude session.
+
+## Case study
+
+See [docs/leaderboard-case-study.md](docs/leaderboard-case-study.md) for a detailed before/after breakdown of the architecture, streak fixes, reset strategy, and rollout decisions.
+
+For the one-time rollout message after a global rescan, see [docs/team-resync-message.md](docs/team-resync-message.md).
 
 ## Contributing
 

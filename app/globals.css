@@ -84,15 +84,6 @@ body {
   box-shadow: 0px 3px 0px -1px var(--color-border);
   overflow: hidden;
 }
-.game-progress-track::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 2px -4px 0px 0px #bfd1e8;
-  pointer-events: none;
-  z-index: 2;
-}
 .game-progress-fill {
   position: relative;
   height: 100%;
@@ -103,7 +94,7 @@ body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 2px -4px 0px 0px rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0px 2px 0px 0px rgba(255, 255, 255, 0.38);
   pointer-events: none;
 }
 
@@ -162,6 +153,50 @@ body {
 .game-btn-ghost:active {
   transform: translateY(2px);
   box-shadow: 0px 2px 0px -2px rgba(0, 0, 30, 0.2);
+}
+
+/* ── Game Tabs ───────────────────────────────────── */
+.game-tab {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-2);
+  box-shadow: 0px 4px 0px -2px var(--color-border);
+  transition: transform 80ms ease, box-shadow 80ms ease;
+  cursor: pointer;
+  user-select: none;
+  padding: 6px 16px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+.game-tab::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 3px -6px 0px 0px #bfd1e8;
+  pointer-events: none;
+}
+.game-tab-active {
+  background: var(--color-accent);
+  border-color: var(--color-accent-border);
+  box-shadow: 0px 4px 0px -2px var(--color-accent-border);
+  color: #0f0f13;
+}
+.game-tab-active::after {
+  box-shadow: inset 5px -10px 0px 0px rgba(255,255,255,0.22);
+}
+.game-tab:active {
+  transform: translateY(2px);
+  box-shadow: 0px 2px 0px -2px var(--color-border);
+}
+.game-tab-active:active {
+  box-shadow: 0px 2px 0px -2px var(--color-accent-border);
 }
 
 /* ── Card icon button (for use on light card surfaces) */
@@ -358,6 +393,17 @@ body {
   from { transform: translateX(0); opacity: 1; }
   to   { transform: translateX(calc(100% + 1.5rem)); opacity: 0; }
 }
+
+/* ── Custom scrollbar ────────────────────────────── */
+.game-scrollbar::-webkit-scrollbar        { width: 6px; }
+.game-scrollbar::-webkit-scrollbar-track  { background: transparent; }
+.game-scrollbar::-webkit-scrollbar-thumb  {
+  background: var(--color-surface-2);
+  border: 2px solid var(--color-border);
+  border-radius: 99px;
+}
+.game-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--color-silver); }
+.game-scrollbar { scrollbar-width: thin; scrollbar-color: var(--color-surface-2) transparent; }
 
 .toast-in  { will-change: transform; animation: toast-in  0.25s cubic-bezier(0.215, 0.61, 0.355, 1) both; }
 .toast-out { will-change: transform; animation: toast-out 0.2s  ease-out both; }

@@ -57,8 +57,8 @@ export default function DetailPanel({ userId }: DetailPanelProps) {
   return (
     <div className="px-6 py-4 bg-[var(--color-surface-2)] border-t border-[var(--color-border)]/15 flex flex-col gap-6">
       <div>
-        <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2 font-bold">Activity (90 days)</p>
-        <ActivityHeatmap activity={activity} days={90} />
+        <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2 font-bold">Activity</p>
+        <ActivityHeatmap activity={activity} />
       </div>
       <div>
         <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider mb-2 font-bold">Models used</p>

@@ -5,7 +5,13 @@ export async function DELETE() {
   const session = await auth()
   if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await supabaseAdmin.schema('next_auth').from('users').delete().eq('id', session.user.id)
+  const { error } = await supabaseAdmin.rpc('delete_account', {
+    p_user_id: session.user.id,
+  })
+
+  if (error) {
+    return Response.json({ error: error.message }, { status: 500 })
+  }
 
   return Response.json({ ok: true })
 }

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import StatCard from '@/components/StatCard'
 import ActivityHeatmap from '@/components/ActivityHeatmap'
 import DeleteAccountButton from './DeleteAccountButton'
+import { computeStreaks } from '@/lib/leaderboard-math'
 
 async function getUserStats(userId: string) {
   const { data: stats } = await supabaseAdmin
@@ -14,16 +15,25 @@ async function getUserStats(userId: string) {
     .eq('user_id', userId)
     .single()
 
-  const since = new Date()
-  since.setDate(since.getDate() - 90)
   const { data: activity } = await supabaseAdmin
     .from('daily_activity')
     .select('date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, messages, sessions')
     .eq('user_id', userId)
-    .gte('date', since.toISOString().slice(0, 10))
     .order('date', { ascending: true })
 
-  return { stats, activity: activity ?? [] }
+  const allActivity = activity ?? []
+  const streaks = computeStreaks(allActivity.map((row) => row.date))
+
+  return {
+    stats: stats
+      ? {
+          ...stats,
+          current_streak: streaks.current,
+          longest_streak: Math.max(stats.longest_streak ?? 0, streaks.longest),
+        }
+      : stats,
+    activity: allActivity.slice(-365),
+  }
 }
 
 function relativeTime(iso: string | null): string {
@@ -164,7 +174,7 @@ export default async function ProfilePage() {
             <StatCard label="Messages" value={fmt(stats.total_messages ?? 0)} />
             <StatCard
               label="Streak"
-              value={stats.current_streak > 0 ? `🔥 ${stats.current_streak}d` : '—'}
+              value={stats.current_streak > 0 ? `${stats.current_streak}d` : '—'}
               sub={stats.longest_streak > 0 ? `Best: ${stats.longest_streak}d` : undefined}
             />
             <StatCard label="Sessions" value={stats.total_sessions ?? 0} />
@@ -180,8 +190,8 @@ export default async function ProfilePage() {
 
         {/* Heatmap */}
         <div className="game-card p-5">
-          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Activity (90 days)</p>
-          <ActivityHeatmap activity={activity} days={90} />
+          <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Activity</p>
+          <ActivityHeatmap activity={activity} />
         </div>
 
         {/* Model breakdown */}

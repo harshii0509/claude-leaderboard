@@ -1,38 +1,33 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-let _anon: SupabaseClient | null = null
-let _admin: SupabaseClient | null = null
-
 export function getSupabaseAnon(): SupabaseClient {
-  if (!_anon) {
-    _anon = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_ANON_KEY!
-    )
-  }
-  return _anon
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_ANON_KEY!
+  )
 }
 
 export function getSupabaseAdmin(): SupabaseClient {
-  if (!_admin) {
-    _admin = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-  }
-  return _admin
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
+function createBoundProxy(clientFactory: () => SupabaseClient): SupabaseClient {
+  return new Proxy({} as SupabaseClient, {
+    get(_target, prop) {
+      const client = clientFactory()
+      const value = client[prop as keyof SupabaseClient]
+      if (typeof value === 'function') {
+        return value.bind(client)
+      }
+      return value
+    },
+  })
 }
 
 // Convenience aliases used in route handlers
-export const supabaseAnon = new Proxy({} as SupabaseClient, {
-  get(_t, prop) {
-    return (getSupabaseAnon() as any)[prop]
-  },
-})
-
-export const supabaseAdmin = new Proxy({} as SupabaseClient, {
-  get(_t, prop) {
-    return (getSupabaseAdmin() as any)[prop]
-  },
-})
+export const supabaseAnon = createBoundProxy(() => getSupabaseAnon())
+export const supabaseAdmin = createBoundProxy(() => getSupabaseAdmin())

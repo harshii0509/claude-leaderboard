@@ -1,0 +1,72 @@
+export interface ActivityRow {
+  date: string
+  input_tokens: number
+  output_tokens: number
+  cache_creation_input_tokens: number
+  cache_read_input_tokens: number
+  messages: number
+  sessions: number
+}
+
+export interface StreakSummary {
+  current: number
+  longest: number
+}
+
+function dateKey(value: Date): string {
+  return value.toISOString().slice(0, 10)
+}
+
+function parseDate(value: string): number | null {
+  const time = new Date(`${value}T00:00:00`).getTime()
+  return Number.isFinite(time) ? time : null
+}
+
+export function computeStreaks(dates: string[], today = new Date()): StreakSummary {
+  const uniqueDates = Array.from(new Set(dates))
+    .map((value) => ({ value, time: parseDate(value) }))
+    .filter((item): item is { value: string; time: number } => item.time !== null)
+    .sort((a, b) => a.time - b.time)
+
+  if (uniqueDates.length === 0) {
+    return { current: 0, longest: 0 }
+  }
+
+  let longest = 1
+  let run = 1
+  for (let i = 1; i < uniqueDates.length; i += 1) {
+    const diffDays = Math.round((uniqueDates[i].time - uniqueDates[i - 1].time) / 86_400_000)
+    if (diffDays === 1) {
+      run += 1
+      longest = Math.max(longest, run)
+    } else {
+      run = 1
+    }
+  }
+
+  const active = new Set(uniqueDates.map((item) => item.value))
+  const anchor = new Date(today)
+  anchor.setHours(0, 0, 0, 0)
+
+  const todayStr = dateKey(anchor)
+  if (!active.has(todayStr)) {
+    anchor.setDate(anchor.getDate() - 1)
+  }
+
+  let current = 0
+  while (active.has(dateKey(anchor))) {
+    current += 1
+    anchor.setDate(anchor.getDate() - 1)
+  }
+
+  return { current, longest }
+}
+
+export function totalTokens(row: Pick<ActivityRow, 'input_tokens' | 'output_tokens' | 'cache_creation_input_tokens' | 'cache_read_input_tokens'>): number {
+  return (
+    row.input_tokens +
+    row.output_tokens +
+    row.cache_creation_input_tokens +
+    row.cache_read_input_tokens
+  )
+}
