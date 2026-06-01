@@ -231,6 +231,11 @@ For the full container-oriented flow and operator notes, see [docs/self-hosting.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Support and security
+
+- Support guidance: [SUPPORT.md](SUPPORT.md)
+- Security reporting: [SECURITY.md](SECURITY.md)
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
