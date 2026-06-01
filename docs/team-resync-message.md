@@ -21,3 +21,11 @@ That one sync will:
 After that, your normal Claude Stop hook will continue syncing automatically again.
 
 If your profile still looks empty after running it once, send me a screenshot of the terminal output.
+
+## Operator checklist
+
+After you send the message:
+
+1. Run `npm run leaderboard:status` to see who is still pending.
+2. Open `/admin/leaderboard` if you want the same rollout status in the app UI.
+3. When the pending list reaches zero, optionally run `npm run leaderboard:rebuild` for one last rollup refresh.

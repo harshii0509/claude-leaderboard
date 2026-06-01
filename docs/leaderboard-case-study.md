@@ -88,6 +88,19 @@ Client caches are useful for incremental sync, but they become a liability after
 
 Operational migrations fail when you cannot tell who has actually moved over. The rewrite adds a sync-status control so the team can see which users have repopulated raw events and which users still need one more sync after a global rescan.
 
+## Migration playbook
+
+This project also needed an operational answer to a product question: "How do we reset everyone, keep the users, and refill trustworthy data?"
+
+The final playbook is:
+
+1. `reset` if you want a clean season or want to intentionally wipe leaderboard-derived data while preserving users.
+2. `rescan` if you need all installed clients to replay local history into the new pipeline.
+3. Track refill progress with the CLI status command or `/admin/leaderboard`.
+4. `rebuild` once the raw ledger is fully repopulated and you want a final deterministic rollup pass.
+
+That turns what used to be a manual recovery task into an explicit, repeatable operator workflow.
+
 ## Rollout notes
 
 This rewrite surfaced a real migration gap: only a subset of users had already moved onto the raw-event pipeline. That meant rebuilding from raw events alone could not preserve every historical score immediately. The solution was to add the sync-generation rescan path so installed clients can refill the ledger safely over time.

@@ -107,7 +107,9 @@ These commands require `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`, plus `SUPAB
 npm run leaderboard:status
 ```
 
-Shows the current sync generation plus which users have not yet repopulated raw-event history after a migration or global rescan.
+Shows a human-readable rollout summary: current sync generation, refill progress, and the exact users who still have not repopulated raw-event history after a migration or global rescan.
+
+Use `node scripts/leaderboard-admin.mjs status --json` if you want the raw JSON payload instead.
 
 There is also an authenticated in-app status page at `/admin/leaderboard`.
 
@@ -147,6 +149,15 @@ After that one-time reinstall, syncing continues automatically after each Claude
 See [docs/leaderboard-case-study.md](docs/leaderboard-case-study.md) for a detailed before/after breakdown of the architecture, streak fixes, reset strategy, and rollout decisions.
 
 For the one-time rollout message after a global rescan, see [docs/team-resync-message.md](docs/team-resync-message.md).
+
+## Rollout playbook
+
+When you need to fix scoring logic, rebuild history, or start a clean season without deleting users:
+
+1. Run `npm run leaderboard:reset` if you want to clear leaderboard data and replay from scratch, or `npm run leaderboard:rescan` if you only need clients to resend history into the existing raw-event ledger.
+2. Ask the team to rerun the Setup command or `python3 ~/.claude/sync.py` once.
+3. Monitor progress with `npm run leaderboard:status` or `/admin/leaderboard`.
+4. Once everyone has resynced, run `npm run leaderboard:rebuild` if you want one final rollup refresh from the raw ledger.
 
 ## Contributing
 
