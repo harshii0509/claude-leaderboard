@@ -54,7 +54,9 @@ npm run validate:env
 
 ### 3. Run the database migration
 
-In your Supabase project, open the SQL editor and run the contents of `supabase-migration.sql`. This creates all required tables and RLS policies.
+For new self-hosted setups, apply the ordered SQL files in `supabase/migrations/`.
+
+If you prefer the old one-shot flow, you can still run `supabase-migration.sql` as a compatibility snapshot.
 
 ### 4. Start the dev server
 

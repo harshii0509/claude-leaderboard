@@ -65,7 +65,18 @@ npm run validate:env
 
 ### 3. Run the database schema
 
-Open your Supabase SQL editor and run the contents of `supabase-migration.sql`.
+Prefer the ordered SQL files in `supabase/migrations/`.
+
+Apply them in filename order:
+
+- `202606010001_next_auth.sql`
+- `202606010002_leaderboard_tables.sql`
+- `202606010003_leaderboard_functions.sql`
+- `202606010004_row_level_security.sql`
+
+You can run them in the Supabase SQL editor one by one, or use your preferred migration workflow around that folder.
+
+`supabase-migration.sql` is still kept at the repo root as a compatibility snapshot if you want the older one-shot setup path.
 
 This creates:
 
@@ -201,7 +212,7 @@ These are intentional constraints for the current open-source shape:
 
 If you want to keep pushing this as an OSS project, the next sensible steps are:
 
-1. Split `supabase-migration.sql` into versioned migrations.
+1. Add a Supabase CLI-driven migration workflow around `supabase/migrations/`.
 2. Add focused tests around leaderboard math and sync ingestion.
 3. Add GitHub auth as an optional second provider.
 4. Publish screenshots and a demo dataset for easier evaluation.

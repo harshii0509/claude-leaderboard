@@ -20,7 +20,8 @@ For the full operator path, see [docs/self-hosting.md](docs/self-hosting.md).
 - `app/` contains the Next.js App Router pages and route handlers
 - `lib/` contains auth, sync, and leaderboard logic
 - `public/sync.py` is the client-side collector installed onto user machines
-- `supabase-migration.sql` defines the current database schema and RPCs
+- `supabase/migrations/` is the preferred schema source for new self-hosted setups
+- `supabase-migration.sql` is the compatibility snapshot of the current schema
 - `docs/` holds operator notes, rollout guides, and portfolio-facing writeups
 
 ## Making changes
