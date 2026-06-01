@@ -21,6 +21,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "validate:env": "node scripts/validate-env.mjs",
     "leaderboard:status": "node scripts/leaderboard-admin.mjs status",
     "leaderboard:rescan": "node scripts/leaderboard-admin.mjs rescan",
     "leaderboard:rebuild": "node scripts/leaderboard-admin.mjs rebuild",

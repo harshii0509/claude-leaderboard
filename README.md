@@ -4,6 +4,11 @@ A self-hosted leaderboard for tracking your team's [Claude Code](https://claude.
 
 <!-- Add a screenshot here once designs are finalized -->
 
+This repo now serves two purposes:
+
+- the battle-tested product currently running for your internal team
+- a self-hosted open-source distribution other teams can deploy themselves
+
 ## Features
 
 - **Team leaderboard** — rank members by tokens, messages, or streak
@@ -39,6 +44,14 @@ cp .env.example .env.local
 
 Fill in the values — see [Configuration](#configuration) below.
 
+Validate the environment contract before you boot the app:
+
+```bash
+set -a
+source .env.local
+npm run validate:env
+```
+
 ### 3. Run the database migration
 
 In your Supabase project, open the SQL editor and run the contents of `supabase-migration.sql`. This creates all required tables and RLS policies.
@@ -50,6 +63,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+For a more detailed self-hosting walkthrough, see [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Deployment
 
@@ -149,6 +164,8 @@ After that one-time reinstall, syncing continues automatically after each Claude
 See [docs/leaderboard-case-study.md](docs/leaderboard-case-study.md) for a detailed before/after breakdown of the architecture, streak fixes, reset strategy, and rollout decisions.
 
 For the one-time rollout message after a global rescan, see [docs/team-resync-message.md](docs/team-resync-message.md).
+
+For self-serve deployment guidance aimed at outside teams, see [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Rollout playbook
 
