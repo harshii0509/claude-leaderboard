@@ -30,6 +30,8 @@ The golden path for the first public version is:
 
 That is the path the repo is optimized for today.
 
+If you do not want to use Vercel, the repo now also includes a production `Dockerfile` built around Next.js standalone output.
+
 ## Prerequisites
 
 - Node.js 18+
@@ -83,6 +85,35 @@ Open `http://localhost:3000`.
 ### 5. Deploy
 
 The easiest deploy target is Vercel. Set the same environment variables in your hosting provider and update `NEXT_PUBLIC_APP_URL` to your public domain.
+
+## Docker deployment
+
+This repo ships a production container path for teams running on platforms like Render, Railway, Fly.io, DigitalOcean Apps, Kubernetes, or plain Docker hosts.
+
+### Build the image
+
+```bash
+docker build -t claude-leaderboard .
+```
+
+### Run the container
+
+```bash
+docker run --rm -p 3000:3000 --env-file .env.local claude-leaderboard
+```
+
+The container uses:
+
+- Next.js standalone output
+- `HOSTNAME=0.0.0.0`
+- `PORT=3000`
+- `node server.js`
+
+### Notes
+
+- Keep `NEXT_PUBLIC_APP_URL` pointed at your public domain, not `localhost`, for real user installs.
+- The app still depends on Supabase and Google OAuth, so containerizing the app does not remove those external dependencies.
+- Local development is still better with `npm run dev`; Docker is primarily for production-style deployment.
 
 ## Required environment variables
 

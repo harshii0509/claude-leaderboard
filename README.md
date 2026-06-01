@@ -74,6 +74,8 @@ The easiest way to deploy is Vercel:
 
 After deploying, add your environment variables in the Vercel dashboard under **Settings → Environment Variables**, then set `NEXT_PUBLIC_APP_URL` to your production URL.
 
+If you want to self-host outside Vercel, this repo also supports a Docker-based deployment path using Next.js standalone output. See [docs/self-hosting.md](docs/self-hosting.md).
+
 ## Configuration
 
 | Variable | Required | Description |
@@ -186,6 +188,24 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## Docker deployment
+
+This repo includes a production `Dockerfile` for teams that want to self-host on any platform that can run containers.
+
+Build the image:
+
+```bash
+docker build -t claude-leaderboard .
+```
+
+Run it with your environment variables:
+
+```bash
+docker run --rm -p 3000:3000 --env-file .env.local claude-leaderboard
+```
+
+For the full container-oriented flow and operator notes, see [docs/self-hosting.md](docs/self-hosting.md).
 
 ## Contributing
 
