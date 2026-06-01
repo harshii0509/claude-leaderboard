@@ -2,6 +2,8 @@
 
 This guide is for teams who want to deploy their own copy of Claude Leaderboard without depending on the Juspay instance.
 
+If you want to hand the repo to a coding agent and have it drive the setup with explicit human checkpoints, start with [docs/agent-setup.md](docs/agent-setup.md). This document remains the deeper operator reference.
+
 The current production deployment can keep running exactly as-is. This repo is being hardened so other teams can self-host the same core product:
 
 - the same raw-event sync pipeline
@@ -42,6 +44,19 @@ If you do not want to use Vercel, the repo now also includes a production `Docke
 - a public app URL for your deployment
 
 ## Quick start
+
+### Agent setup
+
+For the fastest guided setup path, especially if you want Codex, Claude Code, or another shell-capable agent to do most of the work, use [docs/agent-setup.md](docs/agent-setup.md).
+
+It is the decision-complete setup contract for:
+
+- cloning and installing the repo
+- collecting human-supplied secrets and hosted-service configuration
+- validating `.env.local`
+- applying the schema
+- booting the app
+- verifying first-user sync or demo data
 
 ### 1. Clone and install
 

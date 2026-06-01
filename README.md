@@ -22,6 +22,18 @@ This repo now serves two purposes:
 
 ## Quick start
 
+### Agent setup
+
+If you want to hand this repo to a coding agent and let it drive the setup, start with [docs/agent-setup.md](docs/agent-setup.md).
+
+That playbook is the agent-facing contract for this repo: it tells the agent exactly how to bootstrap the app, where to pause for human-owned secrets or OAuth console work, how to verify first-user sync, and how to switch to a demo/evaluation path when you do not want a full team rollout yet.
+
+Starter prompt:
+
+```text
+Set up this repo by following docs/agent-setup.md exactly. Use the default self-hosted path: Vercel + Supabase + Google OAuth. Do everything you can yourself, pause only at the human checkpoints, and verify local boot plus first-user sync before you stop.
+```
+
 ### Prerequisites
 
 - Node.js 18+
@@ -74,6 +86,8 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000).
 
 For a more detailed self-hosting walkthrough, see [docs/self-hosting.md](docs/self-hosting.md).
+
+If you want the shortest guided path for a coding agent, use [docs/agent-setup.md](docs/agent-setup.md).
 
 If you want to evaluate the app without onboarding a real team first, there is also a demo seed at `supabase/seed/demo.sql`.
 
@@ -190,6 +204,8 @@ See [docs/leaderboard-case-study.md](docs/leaderboard-case-study.md) for a detai
 For the one-time rollout message after a global rescan, see [docs/team-resync-message.md](docs/team-resync-message.md).
 
 For self-serve deployment guidance aimed at outside teams, see [docs/self-hosting.md](docs/self-hosting.md).
+
+If you want to delegate that setup to an agent, use [docs/agent-setup.md](docs/agent-setup.md).
 
 ## Rollout playbook
 
