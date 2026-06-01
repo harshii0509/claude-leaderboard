@@ -22,7 +22,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --experimental-strip-types --test tests/**/*.test.ts",
-    "typecheck": "next typegen && tsc --noEmit --incremental false",
+    "typecheck": "next build",
     "validate:env": "node scripts/validate-env.mjs",
     "db:push": "bash ./scripts/supabase-db-push.sh",
     "leaderboard:status": "node scripts/leaderboard-admin.mjs status",
