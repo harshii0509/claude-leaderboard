@@ -28,6 +28,7 @@ For the full operator path, see [docs/self-hosting.md](docs/self-hosting.md).
 - Keep PRs small and focused on a single concern
 - Run `npm run lint` before opening a PR
 - Run `npm run typecheck` for TypeScript changes
+- Run `npm test` when touching leaderboard math or sync payload handling
 - Run `npm run build` for routing, deployment, or config changes
 - If adding a new env var, add it to `.env.example` with a comment
 - If changing leaderboard math or sync behavior, update the relevant docs in `README.md` or `docs/`

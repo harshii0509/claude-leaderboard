@@ -176,6 +176,17 @@ When you need to fix scoring logic, rebuild history, or start a clean season wit
 3. Monitor progress with `npm run leaderboard:status` or `/admin/leaderboard`.
 4. Once everyone has resynced, run `npm run leaderboard:rebuild` if you want one final rollup refresh from the raw ledger.
 
+## Quality checks
+
+Before opening a PR or cutting a release, run:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

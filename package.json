@@ -21,6 +21,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --experimental-strip-types --test tests/**/*.test.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "validate:env": "node scripts/validate-env.mjs",
     "leaderboard:status": "node scripts/leaderboard-admin.mjs status",
