@@ -27,5 +27,5 @@ If your profile still looks empty after running it once, send me a screenshot of
 After you send the message:
 
 1. Run `npm run leaderboard:status` to see who is still pending.
-2. Open `/admin/leaderboard` if you want the same rollout status in the app UI.
+2. Open `/admin/leaderboard` if you want the same rollout status in the app UI, plus copyable resync messaging built from the live pending-user list.
 3. When the pending list reaches zero, optionally run `npm run leaderboard:rebuild` for one last rollup refresh.

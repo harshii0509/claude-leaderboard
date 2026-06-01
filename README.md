@@ -111,7 +111,7 @@ Shows a human-readable rollout summary: current sync generation, refill progress
 
 Use `node scripts/leaderboard-admin.mjs status --json` if you want the raw JSON payload instead.
 
-There is also an authenticated in-app status page at `/admin/leaderboard`.
+There is also an authenticated in-app status page at `/admin/leaderboard`, including copyable resync messaging and a live pending-user list for operator follow-up.
 
 ```bash
 npm run leaderboard:rebuild

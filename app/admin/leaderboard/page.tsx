@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getLeaderboardSyncStatus } from '@/lib/leaderboard-admin'
+import AdminResyncPanel from './AdminResyncPanel'
 
 function formatSyncTime(value: string | null) {
   if (!value) return 'Never'
@@ -98,6 +99,11 @@ export default async function LeaderboardAdminPage() {
             or rerun the Setup command. Their normal Stop hook will continue working after that.
           </p>
         </div>
+
+        <AdminResyncPanel
+          syncGeneration={status.sync_generation}
+          pendingUsers={status.needs_sync}
+        />
 
         <div className="game-card p-5 overflow-x-auto">
           <div className="flex items-center justify-between gap-3 mb-4">
