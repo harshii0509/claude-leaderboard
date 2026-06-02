@@ -7,6 +7,7 @@ it only extracts finalized usage events and uploads raw facts.
 The server computes streaks, totals, sessions, and model breakdowns.
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -23,10 +24,12 @@ from pathlib import Path
 CLAUDE_DIR = Path.home() / ".claude"
 CONFIG_FILE = CLAUDE_DIR / "sync_config.json"
 CACHE_FILE = CLAUDE_DIR / "sync_cache.json"
+SETTINGS_FILE = CLAUDE_DIR / "settings.json"
+EXPECTED_SCRIPT_PATH = CLAUDE_DIR / "sync.py"
 CODEX_DIR = Path.home() / ".codex"
 CODEX_LOG_DB = CODEX_DIR / "logs_2.sqlite"
 SCHEMA_VERSION = 2
-SCRIPT_VERSION = "2.1.0"
+SCRIPT_VERSION = "2.2.0"
 MAX_EVENTS_PER_BATCH = 5000
 
 CODEX_FIELD_PATTERNS = {
@@ -42,6 +45,10 @@ CODEX_FIELD_PATTERNS = {
 }
 
 
+def stderr(message: str):
+    print(message, file=sys.stderr)
+
+
 def fresh_cache(sync_generation=None):
     cache = {"schema_version": SCHEMA_VERSION, "files": {}, "codex": {}}
     if sync_generation is not None:
@@ -49,15 +56,24 @@ def fresh_cache(sync_generation=None):
     return cache
 
 
+def load_json(path: Path, missing_message: str, invalid_message: str):
+    if not path.exists():
+        raise SystemExit(missing_message)
+    try:
+        with path.open(encoding="utf-8") as handle:
+            return json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"{invalid_message}: {exc}") from exc
+
+
 def load_config():
-    if not CONFIG_FILE.exists():
-        print("sync_config.json not found. Run the install script first.", file=sys.stderr)
-        sys.exit(1)
-    with open(CONFIG_FILE, encoding="utf-8") as f:
-        config = json.load(f)
+    config = load_json(
+        CONFIG_FILE,
+        "sync_config.json not found. Run the install script first.",
+        "sync_config.json is not valid JSON",
+    )
     if "sync_token" not in config:
-        print("sync_config.json is missing sync_token.", file=sys.stderr)
-        sys.exit(1)
+        raise SystemExit("sync_config.json is missing sync_token.")
     return config
 
 
@@ -65,8 +81,8 @@ def load_cache():
     if not CACHE_FILE.exists():
         return fresh_cache()
     try:
-        with open(CACHE_FILE, encoding="utf-8") as f:
-            cache = json.load(f)
+        with CACHE_FILE.open(encoding="utf-8") as handle:
+            cache = json.load(handle)
     except (OSError, json.JSONDecodeError):
         return fresh_cache()
 
@@ -83,8 +99,8 @@ def load_cache():
 
 def save_cache(cache):
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(cache, f)
+    with CACHE_FILE.open("w", encoding="utf-8") as handle:
+        json.dump(cache, handle)
 
 
 def parse_timestamp(ts: str):
@@ -140,10 +156,10 @@ def iter_events(path: Path, state):
     if offset > stat.st_size:
         offset = 0
 
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        f.seek(offset)
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        handle.seek(offset)
         while True:
-            raw_line = f.readline()
+            raw_line = handle.readline()
             if not raw_line:
                 break
 
@@ -193,7 +209,7 @@ def iter_events(path: Path, state):
                 "source": "claude",
             }
 
-        end_offset = f.tell()
+        end_offset = handle.tell()
 
     next_state = {
         "offset": end_offset,
@@ -241,13 +257,11 @@ def post_events(api_url, sync_token, events):
             if body:
                 return json.loads(body.decode("utf-8"))
             return {"ok": True}
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")
-        print(f"Sync failed: HTTP {e.code} {detail}", file=sys.stderr)
-        sys.exit(1)
-    except urllib.error.URLError as e:
-        print(f"Sync failed: {e.reason}", file=sys.stderr)
-        sys.exit(1)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise SystemExit(f"Sync failed: HTTP {exc.code} {detail}") from exc
+    except urllib.error.URLError as exc:
+        raise SystemExit(f"Sync failed: {exc.reason}") from exc
 
 
 def chunked(items, size):
@@ -327,7 +341,7 @@ def iter_codex_events(state):
     return events, {"last_id": max_id}
 
 
-def sync_once(api_url, sync_token, cache):
+def collect_events(cache):
     projects_dir = CLAUDE_DIR / "projects"
     next_files = {}
     events = {}
@@ -344,8 +358,12 @@ def sync_once(api_url, sync_token, cache):
     for event_id, event in codex_events.items():
         events[event_id] = event
 
+    return list(events.values()), next_files, codex_state
+
+
+def sync_once(api_url, sync_token, cache):
+    ordered_events, next_files, codex_state = collect_events(cache)
     server_generation = cache.get("sync_generation")
-    ordered_events = list(events.values())
     batches = list(chunked(ordered_events, MAX_EVENTS_PER_BATCH)) or [[]]
 
     for batch in batches:
@@ -357,7 +375,74 @@ def sync_once(api_url, sync_token, cache):
     return next_files, codex_state, server_generation
 
 
-def main():
+def hook_present():
+    if not SETTINGS_FILE.exists():
+        return False
+    try:
+        settings = load_json(SETTINGS_FILE, "", "settings.json is not valid JSON")
+    except SystemExit:
+        return False
+
+    hooks = settings.get("hooks", {})
+    stop_hooks = hooks.get("Stop", [])
+    expected_command = f"python3 {EXPECTED_SCRIPT_PATH}"
+    for entry in stop_hooks:
+        for hook in entry.get("hooks", []):
+            if hook.get("type") == "command" and hook.get("command") == expected_command:
+                return True
+    return False
+
+
+def run_doctor(quiet=False):
+    config = load_config()
+    checks = [
+        ("Claude directory exists", CLAUDE_DIR.exists()),
+        ("Installed script exists", EXPECTED_SCRIPT_PATH.exists()),
+        ("This script is installed at ~/.claude/sync.py", Path(__file__).resolve() == EXPECTED_SCRIPT_PATH.resolve() if EXPECTED_SCRIPT_PATH.exists() else False),
+        ("sync_config.json exists", CONFIG_FILE.exists()),
+        ("sync token present", bool(config.get("sync_token"))),
+        ("api_url present", bool(config.get("api_url"))),
+        ("settings.json exists", SETTINGS_FILE.exists()),
+        ("Claude Stop hook present", hook_present()),
+        ("~/.claude is writable", os.access(CLAUDE_DIR, os.W_OK)),
+    ]
+
+    failures = [label for label, passed in checks if not passed]
+    if not quiet:
+        for label, passed in checks:
+            prefix = "[ok]" if passed else "[fail]"
+            print(f"{prefix} {label}")
+        if CODEX_LOG_DB.exists():
+            print(f"[ok] Codex log source detected at {CODEX_LOG_DB}")
+        else:
+            print(f"[info] Codex log source not found at {CODEX_LOG_DB}")
+        print(f"[info] Script version: {SCRIPT_VERSION}")
+
+    if failures:
+        raise SystemExit("Doctor check failed: " + ", ".join(failures))
+
+    if quiet:
+        print("health-check ok")
+    else:
+        print("Doctor check passed.")
+
+
+def run_dry_run():
+    load_config()
+    cache = load_cache()
+    ordered_events, next_files, codex_state = collect_events(cache)
+    summary = {
+        "script_version": SCRIPT_VERSION,
+        "schema_version": SCHEMA_VERSION,
+        "event_count": len(ordered_events),
+        "claude_sources": len(next_files),
+        "codex_state_present": codex_state is not None,
+        "api_url": load_config().get("api_url", "http://localhost:3000/api/sync"),
+    }
+    print(json.dumps(summary, indent=2))
+
+
+def run_sync():
     config = load_config()
     sync_token = config["sync_token"]
     api_url = config.get("api_url", "http://localhost:3000/api/sync")
@@ -382,5 +467,42 @@ def main():
     save_cache(cache)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Sync local Claude and Codex usage to Claude Leaderboard.")
+    parser.add_argument("--doctor", action="store_true", help="Verify local install health and hook wiring.")
+    parser.add_argument("--dry-run", action="store_true", help="Parse local activity without uploading anything.")
+    parser.add_argument("--health-check", action="store_true", help="Run a concise installer-facing verification.")
+    parser.add_argument("--version", action="store_true", help="Print the installed script version.")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    if args.version:
+        print(SCRIPT_VERSION)
+        return
+
+    if args.health_check:
+        run_doctor(quiet=True)
+        return
+
+    if args.doctor:
+        run_doctor()
+        return
+
+    if args.dry_run:
+        run_dry_run()
+        return
+
+    run_sync()
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit as exc:
+        if isinstance(exc.code, str):
+            stderr(exc.code)
+            raise SystemExit(1) from exc
+        raise

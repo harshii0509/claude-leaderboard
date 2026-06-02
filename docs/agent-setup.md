@@ -182,7 +182,7 @@ The human should sign in with a real account using the configured provider.
 Then the agent should guide the human through:
 
 1. open `/setup`
-2. copy the generated install command
+2. choose either the quick install command or the inspect-before-run command
 3. run that command on the human's machine
 4. run `python3 ~/.claude/sync.py` once
 5. reload the homepage and confirm the user appears on the leaderboard
@@ -191,6 +191,7 @@ Expected result:
 
 - `~/.claude/sync.py` exists
 - `~/.claude/sync_config.json` exists
+- `python3 ~/.claude/sync.py --doctor` succeeds
 - the sync command completes without auth or payload errors
 - the homepage shows the signed-in user with usage data once local activity exists
 

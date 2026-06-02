@@ -189,7 +189,7 @@ After deploy:
 
 1. Sign in as the first user.
 2. Open `/setup`.
-3. Run the generated install command on your own machine.
+3. Run either the quick install command or the inspect-before-run command on your own machine.
 4. Run `python3 ~/.claude/sync.py` once to confirm sync works.
 5. Open the homepage and verify your leaderboard entry appears.
 
@@ -201,6 +201,13 @@ For each teammate:
 2. They open `/setup`.
 3. They run the one-line install command.
 4. Claude begins auto-syncing after each session.
+
+The installer is TTY-aware and safe to rerun. It will:
+
+- detect whether the machine is doing a fresh install, upgrade, or repair
+- preflight `bash`, `curl`, `python3`, and a writable `~/.claude`
+- refresh the Claude Stop hook idempotently
+- run a local health check before it exits
 
 ## Ownership and member management
 
