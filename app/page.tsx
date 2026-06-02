@@ -7,6 +7,7 @@ import SignInButton from '@/components/SignInButton'
 import ErrorToast from '@/components/ErrorToast'
 import { getLeaderboardData } from '@/lib/leaderboard'
 import { getEnabledAuthProviderOptions } from '@/lib/auth-providers'
+import { getAccessDeniedMessage } from '@/lib/auth-domain'
 
 export default async function HomePage({
   searchParams,
@@ -15,6 +16,7 @@ export default async function HomePage({
 }) {
   const params = await searchParams
   const errorCode = typeof params?.error === 'string' ? params.error : null
+  const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN)
   const [session, leaderboardResult] = await Promise.all([
     auth(),
     getLeaderboardData('tokens', 'all')
@@ -75,7 +77,7 @@ export default async function HomePage({
       <main className="relative z-10 max-w-5xl mx-auto px-4 pb-12">
         <LeaderboardClient initialData={leaderboardResult.data} initialLoadFailed={leaderboardResult.failed} />
       </main>
-      <ErrorToast error={errorCode} />
+      <ErrorToast error={errorCode} accessDeniedMessage={accessDeniedMessage} />
     </div>
   )
 }

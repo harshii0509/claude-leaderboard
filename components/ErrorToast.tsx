@@ -2,12 +2,9 @@
 import { useState, useEffect } from 'react'
 import { playError } from '@/lib/audio'
 
-const MESSAGES: Record<string, string> = {
-  AccessDenied: 'Access denied. Only @juspay.in accounts can sign in.',
-  Default: 'Something went wrong. Please try again.',
-}
+const DEFAULT_MESSAGE = 'Something went wrong. Please try again.'
 
-function ToastBody({ error }: { error: string }) {
+function ToastBody({ message, error }: { message: string; error: string }) {
   const [leaving, setLeaving] = useState(false)
 
   useEffect(() => {
@@ -17,8 +14,6 @@ function ToastBody({ error }: { error: string }) {
     }, 4000)
     return () => clearTimeout(dismiss)
   }, [error])
-  
-  const message = MESSAGES[error] ?? MESSAGES.Default
 
   function dismiss() {
     setLeaving(true)
@@ -56,7 +51,17 @@ function ToastBody({ error }: { error: string }) {
   )
 }
 
-export default function ErrorToast({ error }: { error?: string | null }) {
+export default function ErrorToast({
+  error,
+  accessDeniedMessage,
+}: {
+  error?: string | null
+  accessDeniedMessage?: string | null
+}) {
   if (!error) return null
-  return <ToastBody key={error} error={error} />
+
+  const message =
+    error === 'AccessDenied' ? accessDeniedMessage ?? DEFAULT_MESSAGE : DEFAULT_MESSAGE
+
+  return <ToastBody key={error} error={error} message={message} />
 }

@@ -3,6 +3,7 @@ import { SupabaseAdapter } from '@auth/supabase-adapter'
 import { supabaseAdmin } from './db'
 import { ensureSyncCredential } from './sync-auth'
 import { getEnabledAuthProviders } from './auth-providers'
+import { evaluateDomainAccess, maskEmail } from './auth-domain'
 
 const providers = getEnabledAuthProviders()
 
@@ -27,10 +28,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
   }),
   callbacks: {
-    async signIn({ user }) {
-      // If ALLOWED_EMAIL_DOMAIN is set, restrict sign-in to that domain only
-      const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN
-      if (allowedDomain && !user.email?.endsWith(`@${allowedDomain}`)) {
+    async signIn({ user, account, profile }) {
+      const accessDecision = evaluateDomainAccess({
+        allowedEmailDomain: process.env.ALLOWED_EMAIL_DOMAIN,
+        account,
+        profile,
+        userEmail: user.email,
+      })
+
+      if (!accessDecision.allowed) {
+        console.warn('[auth][domain-restriction]', {
+          provider: accessDecision.provider,
+          allowedDomain: accessDecision.allowedDomain,
+          email: maskEmail(accessDecision.normalizedEmail),
+          hasEmail: Boolean(accessDecision.normalizedEmail),
+          emailVerified: accessDecision.emailVerified,
+          hasHostedDomain: Boolean(accessDecision.hostedDomain),
+          hostedDomain: accessDecision.hostedDomain,
+          reason: accessDecision.reason,
+        })
         return false
       }
 
