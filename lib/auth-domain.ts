@@ -64,8 +64,23 @@ function normalizeEmail(value?: string | null): string | null {
   return normalized.length > 0 ? normalized : null
 }
 
+function getEmailDomain(email: string | null): string | null {
+  if (!email) return null
+
+  const [, domain] = email.split('@')
+  return domain ?? null
+}
+
+function isDomainAllowed(domain: string | null, allowedDomains: string[]): boolean {
+  if (!domain) return false
+
+  return allowedDomains.some(
+    (allowedDomain) => domain === allowedDomain || domain.endsWith(`.${allowedDomain}`),
+  )
+}
+
 function matchesAllowedDomain(email: string | null, allowedDomains: string[]): boolean {
-  return allowedDomains.some((allowedDomain) => email?.endsWith(`@${allowedDomain}`) ?? false)
+  return isDomainAllowed(getEmailDomain(email), allowedDomains)
 }
 
 export function maskEmail(email: string | null): string | null {
@@ -132,7 +147,7 @@ export function evaluateDomainAccess({
 
     if (
       matchesAllowedDomain(normalizedEmail, allowedDomains) ||
-      (hostedDomain ? allowedDomains.includes(hostedDomain) : false)
+      isDomainAllowed(hostedDomain, allowedDomains)
     ) {
       return {
         allowed: true,
@@ -150,7 +165,7 @@ export function evaluateDomainAccess({
       allowed: false,
       reason:
         normalizedEmail || hostedDomain
-          ? hostedDomain && !allowedDomains.includes(hostedDomain)
+          ? hostedDomain && !isDomainAllowed(hostedDomain, allowedDomains)
             ? 'hosted_domain_mismatch'
             : 'email_domain_mismatch'
           : 'missing_email',

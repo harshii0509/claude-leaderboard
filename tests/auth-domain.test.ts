@@ -94,6 +94,21 @@ test('evaluateDomainAccess accepts leading @ and comma-separated domains', () =>
   assert.deepEqual(result.allowedDomains, ['juspay.in', 'workspace.juspay.in'])
 })
 
+test('evaluateDomainAccess allows Google users on workspace subdomains of the allowed root domain', () => {
+  const result = evaluateDomainAccess({
+    allowedEmailDomain: 'juspay.in',
+    account: { provider: 'google' },
+    profile: {
+      email: 'person@eng.juspay.in',
+      email_verified: true,
+      hd: 'eng.juspay.in',
+    },
+  })
+
+  assert.equal(result.allowed, true)
+  assert.equal(result.reason, null)
+})
+
 test('evaluateDomainAccess keeps sign-in open when no allowed domain is configured', () => {
   const result = evaluateDomainAccess({
     allowedEmailDomain: undefined,
@@ -110,7 +125,7 @@ test('evaluateDomainAccess keeps sign-in open when no allowed domain is configur
 
 test('evaluateDomainAccess falls back to email-domain matching for non-Google providers', () => {
   const result = evaluateDomainAccess({
-    allowedEmailDomain: 'juspay.in,workspace.juspay.in',
+    allowedEmailDomain: 'juspay.in',
     account: { provider: 'github' },
     userEmail: 'dev@workspace.juspay.in',
   })
