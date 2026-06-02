@@ -2,6 +2,7 @@ import { unstable_cache } from 'next/cache'
 import { supabaseAdmin } from './db'
 import { computeStreaks, totalTokens, type ActivityRow } from './leaderboard-math'
 import { LeaderboardEntry } from '@/components/Podium'
+import { isMissingInstanceGovernanceError } from './instance-governance'
 
 type UserStatRow = {
   user_id: string
@@ -51,24 +52,35 @@ function mapStatRow(row: UserStatRow, usersMap: Record<string, { name: string | 
 }
 
 async function queryLeaderboard(sort: string, period: string): Promise<LeaderboardEntry[]> {
+  let activeUserIds: string[] | null = null
+
   const { data: memberships, error: membershipError } = await supabaseAdmin
     .from('instance_memberships')
     .select('user_id')
     .eq('is_active', true)
 
-  if (membershipError) throw new Error(membershipError.message)
+  if (membershipError) {
+    if (isMissingInstanceGovernanceError(membershipError)) {
+      console.warn('[leaderboard][fallback:missing-instance-governance]', membershipError.message)
+    } else {
+      throw new Error(membershipError.message)
+    }
+  } else {
+    activeUserIds = (memberships ?? []).map((row) => row.user_id as string)
+    if (activeUserIds.length === 0) return []
+  }
 
-  const activeUserIds = (memberships ?? []).map((row) => row.user_id as string)
-  if (activeUserIds.length === 0) return []
-
-  const { data: stats, error } = await supabaseAdmin
+  const statsQuery = supabaseAdmin
     .from('user_stats')
     .select('user_id,total_input_tokens,total_output_tokens,total_cache_creation_input_tokens,total_cache_read_input_tokens,total_messages,total_sessions,longest_streak,models_used,last_synced_at')
-    .in('user_id', activeUserIds)
+  const { data: stats, error } = activeUserIds
+    ? await statsQuery.in('user_id', activeUserIds)
+    : await statsQuery
 
   if (error) throw new Error(error.message)
 
   const typedStats = (stats ?? []) as UserStatRow[]
+  if (typedStats.length === 0) return []
   const userIds = typedStats.map((row) => row.user_id)
   const usersMap: Record<string, { name: string | null; image: string | null }> = {}
 
@@ -84,10 +96,12 @@ async function queryLeaderboard(sort: string, period: string): Promise<Leaderboa
     }
   }
 
-  const { data: activity, error: activityError } = await supabaseAdmin
+  const activityQuery = supabaseAdmin
     .from('daily_activity')
     .select('user_id,date,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,messages,sessions')
-    .in('user_id', activeUserIds)
+  const { data: activity, error: activityError } = userIds.length > 0
+    ? await activityQuery.in('user_id', userIds)
+    : await activityQuery
 
   if (activityError) throw new Error(activityError.message)
 

@@ -42,8 +42,8 @@ begin
 
   if not exists (
     select 1
-    from public.instance_memberships
-    where user_id = p_user_id
+    from public.instance_memberships m
+    where m.user_id = p_user_id
   ) then
     insert into public.instance_memberships (user_id, role)
     values (
@@ -91,7 +91,7 @@ begin
   for v_user_id in
     select id
     from next_auth.users
-    order by created_at, id
+    order by id
   loop
     perform public.ensure_instance_membership(v_user_id);
   end loop;
@@ -186,10 +186,10 @@ begin
     raise exception 'Invalid role';
   end if;
 
-  select role, is_active
+  select m.role, m.is_active
   into v_actor_role, v_actor_active
-  from public.instance_memberships
-  where user_id = p_actor_user_id;
+  from public.instance_memberships m
+  where m.user_id = p_actor_user_id;
 
   if v_actor_role is distinct from 'owner' or v_actor_active is not true then
     raise exception 'Owner access required';
@@ -199,10 +199,10 @@ begin
     raise exception 'Owners cannot change their own role';
   end if;
 
-  select role, is_active
+  select m.role, m.is_active
   into v_target_role, v_target_active
-  from public.instance_memberships
-  where user_id = p_target_user_id;
+  from public.instance_memberships m
+  where m.user_id = p_target_user_id;
 
   if v_target_role is null then
     raise exception 'Target user not found';
@@ -216,10 +216,10 @@ begin
     raise exception 'Inactive users cannot change roles';
   end if;
 
-  update public.instance_memberships
+  update public.instance_memberships m
   set role = p_role,
       updated_at = now()
-  where user_id = p_target_user_id;
+  where m.user_id = p_target_user_id;
 
   return query
   select m.user_id, m.role, m.is_active, m.deactivated_at
@@ -248,10 +248,10 @@ declare
 begin
   perform pg_advisory_xact_lock(6202002);
 
-  select role, is_active
+  select m.role, m.is_active
   into v_actor_role, v_actor_active
-  from public.instance_memberships
-  where user_id = p_actor_user_id;
+  from public.instance_memberships m
+  where m.user_id = p_actor_user_id;
 
   if v_actor_role is distinct from 'owner' or v_actor_active is not true then
     raise exception 'Owner access required';
@@ -261,10 +261,10 @@ begin
     raise exception 'Ownership is already assigned to this user';
   end if;
 
-  select role, is_active
+  select m.role, m.is_active
   into v_target_role, v_target_active
-  from public.instance_memberships
-  where user_id = p_target_user_id;
+  from public.instance_memberships m
+  where m.user_id = p_target_user_id;
 
   if v_target_role is null then
     raise exception 'Target user not found';
@@ -274,15 +274,15 @@ begin
     raise exception 'Ownership can only be transferred to an active user';
   end if;
 
-  update public.instance_memberships
+  update public.instance_memberships m
   set role = 'admin',
       updated_at = now()
-  where user_id = p_actor_user_id;
+  where m.user_id = p_actor_user_id;
 
-  update public.instance_memberships
+  update public.instance_memberships m
   set role = 'owner',
       updated_at = now()
-  where user_id = p_target_user_id;
+  where m.user_id = p_target_user_id;
 end;
 $$;
 
@@ -310,10 +310,10 @@ declare
   v_target_role text;
   v_target_active boolean;
 begin
-  select role, is_active
+  select m.role, m.is_active
   into v_actor_role, v_actor_active
-  from public.instance_memberships
-  where user_id = p_actor_user_id;
+  from public.instance_memberships m
+  where m.user_id = p_actor_user_id;
 
   if v_actor_active is not true or v_actor_role not in ('owner', 'admin') then
     raise exception 'Admin access required';
@@ -323,10 +323,10 @@ begin
     raise exception 'Users cannot change their own active state';
   end if;
 
-  select role, is_active
+  select m.role, m.is_active
   into v_target_role, v_target_active
-  from public.instance_memberships
-  where user_id = p_target_user_id;
+  from public.instance_memberships m
+  where m.user_id = p_target_user_id;
 
   if v_target_role is null then
     raise exception 'Target user not found';
@@ -340,12 +340,12 @@ begin
     raise exception 'Admins can only manage members';
   end if;
 
-  update public.instance_memberships
+  update public.instance_memberships m
   set
     is_active = p_is_active,
     deactivated_at = case when p_is_active then null else now() end,
     updated_at = now()
-  where user_id = p_target_user_id;
+  where m.user_id = p_target_user_id;
 
   delete from leaderboard_private.install_tokens
   where user_id = p_target_user_id
