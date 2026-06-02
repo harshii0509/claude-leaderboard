@@ -112,11 +112,7 @@ export function evaluateDomainAccess({
     typeof profile?.hd === 'string' ? profile.hd : null,
   )
   const emailVerified =
-    provider === 'google'
-      ? profile?.email_verified === true
-      : typeof profile?.email_verified === 'boolean'
-        ? profile.email_verified
-        : null
+    typeof profile?.email_verified === 'boolean' ? profile.email_verified : null
 
   if (!allowedDomain) {
     return {
@@ -132,7 +128,7 @@ export function evaluateDomainAccess({
   }
 
   if (provider === 'google') {
-    if (!emailVerified) {
+    if (emailVerified === false) {
       return {
         allowed: false,
         reason: 'unverified_google_email',

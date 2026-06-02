@@ -50,6 +50,20 @@ test('evaluateDomainAccess denies unverified Google emails before domain checks'
   assert.equal(result.reason, 'unverified_google_email')
 })
 
+test('evaluateDomainAccess allows Google users when verification field is missing but domain matches', () => {
+  const result = evaluateDomainAccess({
+    allowedEmailDomain: 'juspay.in',
+    account: { provider: 'google' },
+    profile: {
+      email: 'person@juspay.in',
+    },
+  })
+
+  assert.equal(result.allowed, true)
+  assert.equal(result.reason, null)
+  assert.equal(result.emailVerified, null)
+})
+
 test('evaluateDomainAccess denies Google users outside the allowed domain', () => {
   const result = evaluateDomainAccess({
     allowedEmailDomain: 'juspay.in',
