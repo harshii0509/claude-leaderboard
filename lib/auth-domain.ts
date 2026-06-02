@@ -40,9 +40,14 @@ interface SignInDependencies {
 }
 
 const ERROR_REDIRECTS = {
-  accessDenied: '/?error=AccessDenied',
   membershipInactive: '/?error=MembershipInactive',
 } as const
+
+function buildAccessDeniedRedirect(reason: DomainRestrictionReason | null): string {
+  const params = new URLSearchParams({ error: 'AccessDenied' })
+  if (reason) params.set('reason', reason)
+  return `/?${params.toString()}`
+}
 
 export function normalizeAllowedEmailDomain(value?: string | null): string | null {
   return normalizeAllowedEmailDomains(value)[0] ?? null
@@ -199,9 +204,28 @@ export function evaluateDomainAccess({
   }
 }
 
-export function getAccessDeniedMessage(allowedEmailDomain?: string | null): string {
+export function getAccessDeniedMessage(
+  allowedEmailDomain?: string | null,
+  reason?: DomainRestrictionReason | null,
+): string {
   const allowedDomains = normalizeAllowedEmailDomains(allowedEmailDomain)
   const allowedDomain = allowedDomains[0] ?? null
+  if (reason === 'missing_email') {
+    return 'Access denied. Your sign-in provider did not return an email address. Try your company Google account.'
+  }
+  if (reason === 'unverified_google_email') {
+    return 'Access denied. Google reported this email as unverified. Try your verified company Google account.'
+  }
+  if (reason === 'hosted_domain_mismatch') {
+    return 'Access denied. Google says this account belongs to a different workspace. If you have multiple accounts, switch to your company one.'
+  }
+  if (reason === 'email_domain_mismatch') {
+    if (!allowedDomain) return 'Access denied. This account does not match the allowed sign-in domain.'
+    if (allowedDomains.length > 1) {
+      return 'Access denied. This account does not match the approved company domains. If you have multiple accounts, switch to the right one.'
+    }
+    return `Access denied. This account is not in @${allowedDomain}. If you have multiple Google accounts, switch to your @${allowedDomain} one.`
+  }
   if (!allowedDomain) return 'Access denied. Please try again or contact your admin.'
   if (allowedDomains.length > 1) return 'Access denied. Only approved company accounts can sign in.'
   return `Access denied. Only @${allowedDomain} accounts can sign in.`
@@ -225,7 +249,7 @@ export async function authorizeSignIn(
       hostedDomain: accessDecision.hostedDomain,
       reason: accessDecision.reason,
     })
-    return ERROR_REDIRECTS.accessDenied
+    return buildAccessDeniedRedirect(accessDecision.reason)
   }
 
   if (!input.userId) return true

@@ -7,7 +7,7 @@ import SignInButton from '@/components/SignInButton'
 import ErrorToast from '@/components/ErrorToast'
 import { getLeaderboardData } from '@/lib/leaderboard'
 import { getEnabledAuthProviderOptions } from '@/lib/auth-providers'
-import { getAccessDeniedMessage } from '@/lib/auth-domain'
+import { getAccessDeniedMessage, type DomainRestrictionReason } from '@/lib/auth-domain'
 
 export default async function HomePage({
   searchParams,
@@ -16,7 +16,9 @@ export default async function HomePage({
 }) {
   const params = await searchParams
   const errorCode = typeof params?.error === 'string' ? params.error : null
-  const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN)
+  const accessDeniedReason =
+    typeof params?.reason === 'string' ? (params.reason as DomainRestrictionReason) : null
+  const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN, accessDeniedReason)
   const [session, leaderboardResult] = await Promise.all([
     auth(),
     getLeaderboardData('tokens', 'all')

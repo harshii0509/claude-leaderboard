@@ -169,6 +169,14 @@ test('getAccessDeniedMessage reflects the configured domain', () => {
     'Access denied. Only @juspay.in accounts can sign in.',
   )
   assert.equal(
+    getAccessDeniedMessage('JusPay.In', 'email_domain_mismatch'),
+    'Access denied. This account is not in @juspay.in. If you have multiple Google accounts, switch to your @juspay.in one.',
+  )
+  assert.equal(
+    getAccessDeniedMessage('JusPay.In', 'hosted_domain_mismatch'),
+    'Access denied. Google says this account belongs to a different workspace. If you have multiple accounts, switch to your company one.',
+  )
+  assert.equal(
     getAccessDeniedMessage(undefined),
     'Access denied. Please try again or contact your admin.',
   )
