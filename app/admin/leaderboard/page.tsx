@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
-import { getLeaderboardSyncStatus } from '@/lib/leaderboard-admin'
+import { getInstanceMembershipSummaries, getLeaderboardSyncStatus } from '@/lib/leaderboard-admin'
 import AdminResyncPanel from './AdminResyncPanel'
+import { requireAdminSession } from '@/lib/access'
+import AdminMembersPanel from './AdminMembersPanel'
 
 function formatSyncTime(value: string | null) {
   if (!value) return 'Never'
@@ -17,10 +17,12 @@ function formatSyncTime(value: string | null) {
 }
 
 export default async function LeaderboardAdminPage() {
-  const session = await auth()
-  if (!session?.user) redirect('/api/auth/signin')
+  const { session, membership } = await requireAdminSession()
 
-  const status = await getLeaderboardSyncStatus()
+  const [status, members] = await Promise.all([
+    getLeaderboardSyncStatus(),
+    getInstanceMembershipSummaries(),
+  ])
   const completion = status.total_users > 0
     ? Math.round((status.users_with_raw_events / status.total_users) * 100)
     : 0
@@ -47,10 +49,10 @@ export default async function LeaderboardAdminPage() {
               className="text-2xl text-white tracking-tight leading-tight"
               style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}
             >
-              Leaderboard Migration Status
+              Leaderboard Admin Workspace
             </h1>
             <p className="text-xs text-white/65 mt-0.5 font-bold">
-              Track who has repopulated fresh raw usage history
+              Manage instance members, ownership, and rollout health
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -65,6 +67,12 @@ export default async function LeaderboardAdminPage() {
       </header>
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 pb-12 flex flex-col gap-4">
+        <AdminMembersPanel
+          currentUserId={session.user.id}
+          currentUserRole={membership.role}
+          members={members}
+        />
+
         <div className="grid gap-4 md:grid-cols-4">
           <div className="game-card p-4">
             <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold">Sync Generation</p>
@@ -93,7 +101,7 @@ export default async function LeaderboardAdminPage() {
         </div>
 
         <div className="game-card p-5 flex flex-col gap-3">
-          <p className="text-sm text-[var(--color-text)] font-semibold">Recommended next step</p>
+          <p className="text-sm text-[var(--color-text)] font-semibold">Rollout helper</p>
           <p className="text-sm text-[var(--color-muted)]">
             Ask everyone in the list below to run <code className="text-[var(--color-text)] font-mono">python3 ~/.claude/sync.py</code> once,
             or rerun the Setup command. Their normal Stop hook will continue working after that.

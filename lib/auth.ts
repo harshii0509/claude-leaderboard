@@ -4,6 +4,7 @@ import { supabaseAdmin } from './db'
 import { ensureSyncCredential } from './sync-auth'
 import { getEnabledAuthProviders } from './auth-providers'
 import { evaluateDomainAccess, maskEmail } from './auth-domain'
+import { ensureInstanceMembership } from './instance-membership'
 
 const providers = getEnabledAuthProviders()
 
@@ -51,6 +52,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       if (!user.id) return true
+      const membership = await ensureInstanceMembership(user.id)
+
+      if (!membership.is_active) {
+        console.warn('[auth][membership-inactive]', {
+          userId: user.id,
+          role: membership.role,
+          deactivatedAt: membership.deactivated_at,
+        })
+        return false
+      }
+
       await supabaseAdmin
         .from('user_stats')
         .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true })

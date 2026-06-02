@@ -51,9 +51,20 @@ function mapStatRow(row: UserStatRow, usersMap: Record<string, { name: string | 
 }
 
 async function queryLeaderboard(sort: string, period: string): Promise<LeaderboardEntry[]> {
+  const { data: memberships, error: membershipError } = await supabaseAdmin
+    .from('instance_memberships')
+    .select('user_id')
+    .eq('is_active', true)
+
+  if (membershipError) throw new Error(membershipError.message)
+
+  const activeUserIds = (memberships ?? []).map((row) => row.user_id as string)
+  if (activeUserIds.length === 0) return []
+
   const { data: stats, error } = await supabaseAdmin
     .from('user_stats')
     .select('user_id,total_input_tokens,total_output_tokens,total_cache_creation_input_tokens,total_cache_read_input_tokens,total_messages,total_sessions,longest_streak,models_used,last_synced_at')
+    .in('user_id', activeUserIds)
 
   if (error) throw new Error(error.message)
 
@@ -76,6 +87,7 @@ async function queryLeaderboard(sort: string, period: string): Promise<Leaderboa
   const { data: activity, error: activityError } = await supabaseAdmin
     .from('daily_activity')
     .select('user_id,date,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,messages,sessions')
+    .in('user_id', activeUserIds)
 
   if (activityError) throw new Error(activityError.message)
 

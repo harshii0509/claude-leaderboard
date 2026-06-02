@@ -3,6 +3,11 @@ import { useState, useEffect } from 'react'
 import { playError } from '@/lib/audio'
 
 const DEFAULT_MESSAGE = 'Something went wrong. Please try again.'
+const MESSAGE_BY_ERROR: Record<string, string> = {
+  MembershipInactive: 'Your access to this leaderboard has been removed. Contact an admin if this is unexpected.',
+  AdminRequired: 'Admin access is required to view that page.',
+  OwnerRequired: 'Owner access is required to do that.',
+}
 
 function ToastBody({ message, error }: { message: string; error: string }) {
   const [leaving, setLeaving] = useState(false)
@@ -61,7 +66,9 @@ export default function ErrorToast({
   if (!error) return null
 
   const message =
-    error === 'AccessDenied' ? accessDeniedMessage ?? DEFAULT_MESSAGE : DEFAULT_MESSAGE
+    error === 'AccessDenied'
+      ? accessDeniedMessage ?? DEFAULT_MESSAGE
+      : MESSAGE_BY_ERROR[error] ?? DEFAULT_MESSAGE
 
   return <ToastBody key={error} error={error} message={message} />
 }

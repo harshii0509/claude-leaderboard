@@ -1,5 +1,3 @@
-import { auth } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/db'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -7,6 +5,7 @@ import StatCard from '@/components/StatCard'
 import ActivityHeatmap from '@/components/ActivityHeatmap'
 import DeleteAccountButton from './DeleteAccountButton'
 import { computeStreaks } from '@/lib/leaderboard-math'
+import { canCurrentUserSelfDelete, requireActiveSession } from '@/lib/access'
 
 async function getUserStats(userId: string) {
   const { data: stats } = await supabaseAdmin
@@ -62,8 +61,10 @@ function fmt(n: number) {
 }
 
 export default async function ProfilePage() {
-  const session = await auth()
-  if (!session?.user) redirect('/api/auth/signin')
+  const [{ session, membership }, allowSelfDelete] = await Promise.all([
+    requireActiveSession(),
+    canCurrentUserSelfDelete(),
+  ])
 
   const { stats, activity } = await getUserStats(session.user.id)
 
@@ -230,8 +231,18 @@ export default async function ProfilePage() {
             </div>
             <div className="border-t border-[var(--color-surface-2)] pt-4">
               <p className="text-sm text-[var(--color-text)] font-semibold mb-1">Delete account</p>
-              <p className="text-sm text-[var(--color-muted)] mb-3">Permanently deletes all your stored data — stats, activity, and account.</p>
-              <DeleteAccountButton />
+              {allowSelfDelete ? (
+                <>
+                  <p className="text-sm text-[var(--color-muted)] mb-3">Permanently deletes all your stored data — stats, activity, and account.</p>
+                  <DeleteAccountButton />
+                </>
+              ) : (
+                <p className="text-sm text-[var(--color-muted)]">
+                  {membership.role === 'owner' || membership.role === 'admin'
+                    ? 'Privileged accounts must be removed or transferred from the admin panel first.'
+                    : 'Account deletion is not available right now.'}
+                </p>
+              )}
             </div>
           </div>
         </div>

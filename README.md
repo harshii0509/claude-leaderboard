@@ -166,6 +166,18 @@ Use `node scripts/leaderboard-admin.mjs status --json` if you want the raw JSON 
 
 There is also an authenticated in-app status page at `/admin/leaderboard`, including copyable resync messaging and a live pending-user list for operator follow-up.
 
+## Ownership and admin controls
+
+Each self-hosted instance now has explicit governance:
+
+- the first successful signed-in user becomes the initial `owner`
+- the owner can promote or demote admins and transfer ownership
+- admins can manage regular members
+- deactivated members are hidden from the live leaderboard and blocked from new sync/setup activity
+- hard delete permanently removes a user account and synced leaderboard history
+
+For safety, privileged users cannot self-delete from the profile page. Transfer or remove them from `/admin/leaderboard` instead.
+
 ```bash
 npm run leaderboard:rebuild
 ```

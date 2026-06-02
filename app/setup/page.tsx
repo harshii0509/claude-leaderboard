@@ -1,13 +1,11 @@
-import { auth } from '@/lib/auth'
-import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { issueInstallToken } from '@/lib/sync-auth'
 import CopyButton from './CopyButton'
 import SetupModal from './SetupModal'
+import { requireActiveSession } from '@/lib/access'
 
 export default async function SetupPage() {
-  const session = await auth()
-  if (!session?.user) redirect('/api/auth/signin')
+  const { session } = await requireActiveSession()
 
   const headerStore = await headers()
   const forwardedProto = headerStore.get('x-forwarded-proto')

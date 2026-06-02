@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { getLeaderboardData } from '@/lib/leaderboard'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const sort = searchParams.get('sort') ?? 'tokens'

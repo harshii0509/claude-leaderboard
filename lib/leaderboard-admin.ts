@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './db'
+import type { InstanceMemberSummary } from './instance-membership'
 
 export interface LeaderboardSyncStatusUser {
   user_id: string
@@ -36,4 +37,14 @@ export async function getLeaderboardSyncStatus(): Promise<LeaderboardSyncStatus>
     users_without_raw_events: typeof status.users_without_raw_events === 'number' ? status.users_without_raw_events : 0,
     needs_sync: Array.isArray(status.needs_sync) ? (status.needs_sync as LeaderboardSyncStatusUser[]) : [],
   }
+}
+
+export async function getInstanceMembershipSummaries(): Promise<InstanceMemberSummary[]> {
+  const { data, error } = await supabaseAdmin.rpc('list_instance_memberships')
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return Array.isArray(data) ? (data as InstanceMemberSummary[]) : []
 }

@@ -12,7 +12,7 @@ export async function GET(
     syncToken = await consumeInstallToken(token)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
-    return Response.json({ error: message }, { status: 500 })
+    return Response.json({ error: message }, { status: message.includes('inactive') ? 403 : 500 })
   }
 
   if (!syncToken) {

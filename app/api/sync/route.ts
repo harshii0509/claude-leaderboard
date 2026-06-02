@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getUserIdForSyncToken } from '@/lib/sync-auth'
 import { syncUserStats, validateSyncPayload } from '@/lib/sync'
+import { getInstanceMembership } from '@/lib/instance-membership'
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization') ?? ''
@@ -20,6 +21,11 @@ export async function POST(request: NextRequest) {
 
   if (!userId) {
     return Response.json({ error: 'Invalid token' }, { status: 401 })
+  }
+
+  const membership = await getInstanceMembership(userId)
+  if (!membership?.is_active) {
+    return Response.json({ error: 'User is inactive' }, { status: 403 })
   }
 
   let payload: unknown

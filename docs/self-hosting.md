@@ -202,6 +202,27 @@ For each teammate:
 3. They run the one-line install command.
 4. Claude begins auto-syncing after each session.
 
+## Ownership and member management
+
+Every self-hosted instance has one owner at a time.
+
+- the first successful signed-in user becomes the initial owner automatically
+- the owner can transfer ownership and promote or demote admins
+- admins can manage regular members and operational rollout tasks
+- member management lives in `/admin/leaderboard`
+
+There are two separate removal flows:
+
+- `Deactivate`: hides the user from the active leaderboard and blocks future setup/sync activity, but keeps history for audit or later restoration
+- `Hard delete`: permanently removes the account and synced leaderboard data
+
+Recommended operator practice:
+
+1. create at least two privileged accounts so the instance is never stranded on one person
+2. use `Deactivate` first when you only want someone off the board
+3. reserve `Hard delete` for real account/data removal
+4. transfer ownership before removing the current owner from day-to-day operations
+
 ## Demo / evaluation mode
 
 If you want to understand the product before rolling it out to a real team, use the demo seed in `supabase/seed/demo.sql`.
