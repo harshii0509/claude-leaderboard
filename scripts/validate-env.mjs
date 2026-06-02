@@ -68,8 +68,17 @@ if (appUrl && !isPlaceholder(appUrl)) {
 }
 
 const allowedDomain = process.env.ALLOWED_EMAIL_DOMAIN
-if (allowedDomain && (allowedDomain.includes('@') || allowedDomain.includes(' '))) {
-  warnings.push('ALLOWED_EMAIL_DOMAIN should be a bare domain like company.com, not an email address.')
+if (allowedDomain) {
+  const normalizedParts = allowedDomain
+    .split(/[,\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (normalizedParts.some((part) => /^[^@\s]+@[^@\s]+$/.test(part))) {
+    warnings.push(
+      'ALLOWED_EMAIL_DOMAIN should contain domains like company.com, optionally comma-separated, not full email addresses.',
+    )
+  }
 }
 
 for (const key of optional) {

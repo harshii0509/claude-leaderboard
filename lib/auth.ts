@@ -1,9 +1,8 @@
 import NextAuth from 'next-auth'
 import { SupabaseAdapter } from '@auth/supabase-adapter'
 import { supabaseAdmin } from './db'
-import { ensureSyncCredential } from './sync-auth'
 import { getEnabledAuthProviders } from './auth-providers'
-import { evaluateDomainAccess, maskEmail } from './auth-domain'
+import { authorizeSignIn } from './auth-domain'
 import { ensureInstanceMembership } from './instance-membership'
 
 const providers = getEnabledAuthProviders()
@@ -30,44 +29,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   }),
   callbacks: {
     async signIn({ user, account, profile }) {
-      const accessDecision = evaluateDomainAccess({
-        allowedEmailDomain: process.env.ALLOWED_EMAIL_DOMAIN,
-        account,
-        profile,
-        userEmail: user.email,
-      })
-
-      if (!accessDecision.allowed) {
-        console.warn('[auth][domain-restriction]', {
-          provider: accessDecision.provider,
-          allowedDomain: accessDecision.allowedDomain,
-          email: maskEmail(accessDecision.normalizedEmail),
-          hasEmail: Boolean(accessDecision.normalizedEmail),
-          emailVerified: accessDecision.emailVerified,
-          hasHostedDomain: Boolean(accessDecision.hostedDomain),
-          hostedDomain: accessDecision.hostedDomain,
-          reason: accessDecision.reason,
-        })
-        return false
-      }
-
-      if (!user.id) return true
-      const membership = await ensureInstanceMembership(user.id)
-
-      if (!membership.is_active) {
-        console.warn('[auth][membership-inactive]', {
+      return authorizeSignIn(
+        {
+          allowedEmailDomain: process.env.ALLOWED_EMAIL_DOMAIN,
+          account,
+          profile,
           userId: user.id,
-          role: membership.role,
-          deactivatedAt: membership.deactivated_at,
-        })
-        return false
-      }
+          userEmail: user.email,
+        },
+        {
+          ensureMembership: ensureInstanceMembership,
+          async upsertUserStats(userId) {
+            const { error } = await supabaseAdmin
+              .from('user_stats')
+              .upsert({ user_id: userId }, { onConflict: 'user_id', ignoreDuplicates: true })
 
-      await supabaseAdmin
-        .from('user_stats')
-        .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true })
-      await ensureSyncCredential(user.id)
-      return true
+            if (error) throw new Error(error.message)
+          },
+        },
+      )
     },
     async session({ session, user }) {
       if (session.user) {

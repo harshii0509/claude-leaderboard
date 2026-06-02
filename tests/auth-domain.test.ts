@@ -4,6 +4,7 @@ import {
   evaluateDomainAccess,
   getAccessDeniedMessage,
   normalizeAllowedEmailDomain,
+  normalizeAllowedEmailDomains,
 } from '../lib/auth-domain.ts'
 
 test('evaluateDomainAccess allows a verified Google user with a matching email domain', () => {
@@ -75,7 +76,22 @@ test('evaluateDomainAccess normalizes mixed-case domains and surrounding whitesp
 
   assert.equal(result.allowed, true)
   assert.equal(result.allowedDomain, 'juspay.in')
+  assert.deepEqual(result.allowedDomains, ['juspay.in'])
   assert.equal(result.normalizedEmail, 'person@juspay.in')
+})
+
+test('evaluateDomainAccess accepts leading @ and comma-separated domains', () => {
+  const result = evaluateDomainAccess({
+    allowedEmailDomain: ' @juspay.in, workspace.juspay.in ',
+    account: { provider: 'google' },
+    profile: {
+      email: 'person@workspace.juspay.in',
+      email_verified: true,
+    },
+  })
+
+  assert.equal(result.allowed, true)
+  assert.deepEqual(result.allowedDomains, ['juspay.in', 'workspace.juspay.in'])
 })
 
 test('evaluateDomainAccess keeps sign-in open when no allowed domain is configured', () => {
@@ -94,9 +110,9 @@ test('evaluateDomainAccess keeps sign-in open when no allowed domain is configur
 
 test('evaluateDomainAccess falls back to email-domain matching for non-Google providers', () => {
   const result = evaluateDomainAccess({
-    allowedEmailDomain: 'juspay.in',
+    allowedEmailDomain: 'juspay.in,workspace.juspay.in',
     account: { provider: 'github' },
-    userEmail: 'dev@juspay.in',
+    userEmail: 'dev@workspace.juspay.in',
   })
 
   assert.equal(result.allowed, true)
@@ -128,4 +144,12 @@ test('getAccessDeniedMessage reflects the configured domain', () => {
     'Access denied. Please try again or contact your admin.',
   )
   assert.equal(normalizeAllowedEmailDomain('  JUSPAY.IN  '), 'juspay.in')
+  assert.deepEqual(normalizeAllowedEmailDomains(' @JUSPAY.IN, workspace.juspay.in '), [
+    'juspay.in',
+    'workspace.juspay.in',
+  ])
+  assert.equal(
+    getAccessDeniedMessage('juspay.in, workspace.juspay.in'),
+    'Access denied. Only approved company accounts can sign in.',
+  )
 })
