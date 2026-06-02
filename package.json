@@ -2,11 +2,15 @@
   "name": "claude-leaderboard",
   "version": "0.1.0",
   "description": "A self-hosted leaderboard for tracking your team's Claude Code usage",
+  "type": "module",
   "license": "MIT",
   "author": "harshii0509",
   "repository": {
     "type": "git",
     "url": "https://github.com/harshii0509/claude-leaderboard"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   },
   "keywords": [
     "claude",
@@ -18,6 +22,7 @@
   ],
   "scripts": {
     "dev": "next dev",
+    "dev:compat": "node ./scripts/dev-compat.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -41,6 +46,7 @@
     "swr": "^2.4.1"
   },
   "devDependencies": {
+    "@next/swc-wasm-nodejs": "^16.2.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

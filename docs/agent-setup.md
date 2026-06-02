@@ -172,6 +172,7 @@ Expected result:
 
 If blocked:
 
+- if the app fails to boot because of SWC/native-binding startup issues on macOS, verify Node `>=20.9.0` and retry with `npm run dev:compat`
 - if the app fails to boot, report the first real server error rather than guessing
 - if auth redirect URLs are wrong, fix the OAuth console configuration before continuing
 

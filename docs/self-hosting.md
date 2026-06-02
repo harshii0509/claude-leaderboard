@@ -119,6 +119,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+If `npm run dev` stalls around native SWC startup on macOS, or you see code-signing / SWC load failures, confirm your shell is on Node `>=20.9.0` and fall back to:
+
+```bash
+npm run dev:compat
+```
+
+That uses webpack plus the vendored WASM SWC package, which is slower than the default Turbopack path but much more reliable on restricted local runtimes.
+
 ### 5. Deploy
 
 The easiest deploy target is Vercel. Set the same environment variables in your hosting provider and update `NEXT_PUBLIC_APP_URL` to your public domain.

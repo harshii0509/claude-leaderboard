@@ -85,6 +85,14 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+If local dev feels stuck on macOS or in a managed runtime because Next.js cannot load the native SWC binary, first make sure you are on Node `>=20.9.0`, then use the compatibility path:
+
+```bash
+npm run dev:compat
+```
+
+That route forces webpack mode and points Next.js at the vendored WASM SWC package instead of relying on the native binding.
+
 For a more detailed self-hosting walkthrough, see [docs/self-hosting.md](docs/self-hosting.md).
 
 If you want the shortest guided path for a coding agent, use [docs/agent-setup.md](docs/agent-setup.md).
