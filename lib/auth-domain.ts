@@ -13,6 +13,7 @@ export interface DomainAccessDecision {
   allowedDomains: string[]
   provider: string | null
   normalizedEmail: string | null
+  emailDomain: string | null
   emailVerified: boolean | null
   hostedDomain: string | null
 }
@@ -43,9 +44,15 @@ const ERROR_REDIRECTS = {
   membershipInactive: '/?error=MembershipInactive',
 } as const
 
-function buildAccessDeniedRedirect(reason: DomainRestrictionReason | null): string {
+function buildDetailedAccessDeniedRedirect(decision: DomainAccessDecision): string {
   const params = new URLSearchParams({ error: 'AccessDenied' })
-  if (reason) params.set('reason', reason)
+  if (decision.reason) params.set('reason', decision.reason)
+  if (decision.provider) params.set('provider', decision.provider)
+  if (decision.emailDomain) params.set('email_domain', decision.emailDomain)
+  if (decision.hostedDomain) params.set('hosted_domain', decision.hostedDomain)
+  if (decision.emailVerified != null) {
+    params.set('email_verified', decision.emailVerified ? 'true' : 'false')
+  }
   return `/?${params.toString()}`
 }
 
@@ -113,6 +120,7 @@ export function evaluateDomainAccess({
   const allowedDomain = allowedDomains[0] ?? null
   const provider = account?.provider ?? null
   const normalizedEmail = normalizeEmail(profile?.email ?? userEmail ?? null)
+  const emailDomain = getEmailDomain(normalizedEmail)
   const hostedDomain = normalizeAllowedEmailDomain(
     typeof profile?.hd === 'string' ? profile.hd : null,
   )
@@ -127,6 +135,7 @@ export function evaluateDomainAccess({
       allowedDomains: [],
       provider,
       normalizedEmail,
+      emailDomain,
       emailVerified,
       hostedDomain,
     }
@@ -141,6 +150,7 @@ export function evaluateDomainAccess({
         allowedDomains,
         provider,
         normalizedEmail,
+        emailDomain,
         emailVerified,
         hostedDomain,
       }
@@ -157,6 +167,7 @@ export function evaluateDomainAccess({
         allowedDomains,
         provider,
         normalizedEmail,
+        emailDomain,
         emailVerified,
         hostedDomain,
       }
@@ -174,6 +185,7 @@ export function evaluateDomainAccess({
       allowedDomains,
       provider,
       normalizedEmail,
+      emailDomain,
       emailVerified,
       hostedDomain,
     }
@@ -187,6 +199,7 @@ export function evaluateDomainAccess({
       allowedDomains,
       provider,
       normalizedEmail,
+      emailDomain,
       emailVerified,
       hostedDomain,
     }
@@ -199,6 +212,7 @@ export function evaluateDomainAccess({
     allowedDomains,
     provider,
     normalizedEmail,
+    emailDomain,
     emailVerified,
     hostedDomain,
   }
@@ -207,24 +221,36 @@ export function evaluateDomainAccess({
 export function getAccessDeniedMessage(
   allowedEmailDomain?: string | null,
   reason?: DomainRestrictionReason | null,
+  detail?: {
+    provider?: string | null
+    emailDomain?: string | null
+    hostedDomain?: string | null
+    emailVerified?: string | null
+  },
 ): string {
   const allowedDomains = normalizeAllowedEmailDomains(allowedEmailDomain)
   const allowedDomain = allowedDomains[0] ?? null
+  const detailSuffix =
+    detail?.emailDomain || detail?.hostedDomain
+      ? ` Returned identity: email domain ${detail.emailDomain ?? 'unknown'}${
+          detail?.hostedDomain ? `, workspace ${detail.hostedDomain}` : ''
+        }.`
+      : ''
   if (reason === 'missing_email') {
-    return 'Access denied. Your sign-in provider did not return an email address. Try your company Google account.'
+    return `Access denied. Your sign-in provider did not return an email address. Try your company Google account.${detailSuffix}`
   }
   if (reason === 'unverified_google_email') {
-    return 'Access denied. Google reported this email as unverified. Try your verified company Google account.'
+    return `Access denied. Google reported this email as unverified. Try your verified company Google account.${detailSuffix}`
   }
   if (reason === 'hosted_domain_mismatch') {
-    return 'Access denied. Google says this account belongs to a different workspace. If you have multiple accounts, switch to your company one.'
+    return `Access denied. Google says this account belongs to a different workspace. If you have multiple accounts, switch to your company one.${detailSuffix}`
   }
   if (reason === 'email_domain_mismatch') {
-    if (!allowedDomain) return 'Access denied. This account does not match the allowed sign-in domain.'
+    if (!allowedDomain) return `Access denied. This account does not match the allowed sign-in domain.${detailSuffix}`
     if (allowedDomains.length > 1) {
-      return 'Access denied. This account does not match the approved company domains. If you have multiple accounts, switch to the right one.'
+      return `Access denied. This account does not match the approved company domains. If you have multiple accounts, switch to the right one.${detailSuffix}`
     }
-    return `Access denied. This account is not in @${allowedDomain}. If you have multiple Google accounts, switch to your @${allowedDomain} one.`
+    return `Access denied. This account is not in @${allowedDomain}. If you have multiple Google accounts, switch to your @${allowedDomain} one.${detailSuffix}`
   }
   if (!allowedDomain) return 'Access denied. Please try again or contact your admin.'
   if (allowedDomains.length > 1) return 'Access denied. Only approved company accounts can sign in.'
@@ -249,7 +275,7 @@ export async function authorizeSignIn(
       hostedDomain: accessDecision.hostedDomain,
       reason: accessDecision.reason,
     })
-    return buildAccessDeniedRedirect(accessDecision.reason)
+    return buildDetailedAccessDeniedRedirect(accessDecision)
   }
 
   if (!input.userId) return true

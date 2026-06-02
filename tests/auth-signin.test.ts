@@ -37,7 +37,10 @@ test('authorizeSignIn redirects AccessDenied for domain mismatches', async () =>
     createDependencies(),
   )
 
-  assert.equal(result, '/?error=AccessDenied&reason=email_domain_mismatch')
+  assert.equal(
+    result,
+    '/?error=AccessDenied&reason=email_domain_mismatch&provider=google&email_domain=gmail.com&email_verified=true',
+  )
 })
 
 test('authorizeSignIn redirects MembershipInactive for inactive members', async () => {

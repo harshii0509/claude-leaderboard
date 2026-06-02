@@ -18,7 +18,12 @@ export default async function HomePage({
   const errorCode = typeof params?.error === 'string' ? params.error : null
   const accessDeniedReason =
     typeof params?.reason === 'string' ? (params.reason as DomainRestrictionReason) : null
-  const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN, accessDeniedReason)
+  const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN, accessDeniedReason, {
+    provider: typeof params?.provider === 'string' ? params.provider : null,
+    emailDomain: typeof params?.email_domain === 'string' ? params.email_domain : null,
+    hostedDomain: typeof params?.hosted_domain === 'string' ? params.hosted_domain : null,
+    emailVerified: typeof params?.email_verified === 'string' ? params.email_verified : null,
+  })
   const [session, leaderboardResult] = await Promise.all([
     auth(),
     getLeaderboardData('tokens', 'all')
