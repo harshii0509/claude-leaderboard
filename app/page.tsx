@@ -109,9 +109,10 @@ export default async function HomePage({
             <LeaderboardClient
               initialData={leaderboardResult.data}
               initialLoadFailed={leaderboardResult.failed}
+              showPodium={Boolean(session)}
             />
           </div>
-          <JoinRail appUrl={appUrl} />
+          {!session ? <JoinRail appUrl={appUrl} /> : null}
         </div>
       </main>
       <ErrorToast error={errorCode} accessDeniedMessage={accessDeniedMessage} />

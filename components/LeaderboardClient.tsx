@@ -25,9 +25,14 @@ async function fetcher(url: string) {
 interface LeaderboardClientProps {
   initialData: LeaderboardEntry[]
   initialLoadFailed?: boolean
+  showPodium?: boolean
 }
 
-export default function LeaderboardClient({ initialData, initialLoadFailed = false }: LeaderboardClientProps) {
+export default function LeaderboardClient({
+  initialData,
+  initialLoadFailed = false,
+  showPodium = true,
+}: LeaderboardClientProps) {
   const [sort, setSort] = useState<Sort>('tokens')
   const [period, setPeriod] = useState<Period>('all')
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null)
@@ -43,6 +48,7 @@ export default function LeaderboardClient({ initialData, initialLoadFailed = fal
   const hasError = Boolean(error) || initialLoadFailed
   const showEmpty = !isLoading && entries.length === 0
   const errorMessage = error instanceof Error ? error.message : 'Leaderboard data is temporarily unavailable.'
+  const leaderboardCardSpacing = showPodium && top3.length >= 1 ? 'mt-3' : ''
 
   return (
     <div className="flex flex-col">
@@ -51,8 +57,8 @@ export default function LeaderboardClient({ initialData, initialLoadFailed = fal
           Leaderboard data could not be refreshed right now. {errorMessage}
         </div>
       )}
-      {top3.length >= 1 && <Podium key={sort + period} top3={top3} />}
-      <div className="game-card card-enter card-enter-delay-300 p-5 flex flex-col gap-4 relative z-10 mt-3">
+      {showPodium && top3.length >= 1 ? <Podium key={sort + period} top3={top3} /> : null}
+      <div className={`game-card card-enter card-enter-delay-300 p-5 flex flex-col gap-4 relative z-10 ${leaderboardCardSpacing}`}>
         <SortBar sort={sort} period={period} onSort={setSort} onPeriod={setPeriod} />
         {showEmpty ? (
           <div className="rounded-[16px] bg-[var(--color-surface-2)] px-4 py-6 text-center text-sm text-[var(--color-muted)]">
