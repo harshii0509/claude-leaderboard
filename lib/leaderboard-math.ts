@@ -13,7 +13,19 @@ export interface StreakSummary {
   longest: number
 }
 
-function dateKey(value: Date): string {
+export interface WeeklyScoreBreakdown {
+  score: number
+  activeDays: number
+  sessionScore: number
+  tokenScore: number
+}
+
+export interface SeasonWindow {
+  start: string
+  end: string
+}
+
+export function dateKey(value: Date): string {
   const year = value.getFullYear()
   const month = String(value.getMonth() + 1).padStart(2, '0')
   const day = String(value.getDate()).padStart(2, '0')
@@ -72,4 +84,52 @@ export function totalTokens(row: Pick<ActivityRow, 'input_tokens' | 'output_toke
     row.cache_creation_input_tokens +
     row.cache_read_input_tokens
   )
+}
+
+export function startOfWeek(today = new Date()): Date {
+  const anchor = new Date(today)
+  anchor.setHours(0, 0, 0, 0)
+
+  const day = anchor.getDay()
+  const offset = day === 0 ? 6 : day - 1
+  anchor.setDate(anchor.getDate() - offset)
+
+  return anchor
+}
+
+export function seasonWindow(today = new Date()): SeasonWindow {
+  const start = startOfWeek(today)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+
+  return {
+    start: dateKey(start),
+    end: dateKey(end),
+  }
+}
+
+export function daysUntilNextWeek(today = new Date()): number {
+  const start = startOfWeek(today)
+  const next = new Date(start)
+  next.setDate(next.getDate() + 7)
+
+  const diff = next.getTime() - today.getTime()
+  return Math.max(1, Math.ceil(diff / 86_400_000))
+}
+
+export function computeWeeklyScore(rows: ActivityRow[]): WeeklyScoreBreakdown {
+  const activeDays = rows.length
+  const sessionScore = rows.reduce((sum, row) => sum + Math.min(row.sessions, 3) * 18, 0)
+  const tokenScore = rows.reduce((sum, row) => {
+    const dailyTokens = totalTokens(row)
+    const points = Math.round(Math.log10(dailyTokens + 10) * 12)
+    return sum + Math.min(48, points)
+  }, 0)
+
+  return {
+    score: activeDays * 90 + sessionScore + tokenScore,
+    activeDays,
+    sessionScore,
+    tokenScore,
+  }
 }

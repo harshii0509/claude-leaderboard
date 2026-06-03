@@ -36,6 +36,14 @@ For the full operator path, see [docs/self-hosting.md](docs/self-hosting.md).
 - If adding a new env var, add it to `.env.example` with a comment
 - If changing leaderboard math or sync behavior, update the relevant docs in `README.md` or `docs/`
 
+## Branch flow
+
+- `main` is the stable branch and should stay close to what you would be comfortable shipping or distributing.
+- `staging` is the shared testing branch for work that is ready for broader verification but not ready for `main`.
+- `experimentation` is the parking lot for paused, unsettled, or intentionally exploratory work.
+
+If you pause an experiment, add or update its entry in `docs/experiments.md` and capture shipped facts separately in `CHANGELOG.md`.
+
 ## Design constraints
 
 - Preserve the current raw-event ingestion model unless there is a strong reason to replace it

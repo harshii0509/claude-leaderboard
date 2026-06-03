@@ -2,15 +2,13 @@
 
 import { useState, useRef } from 'react'
 import { playSort } from '@/lib/audio'
-
-type Sort = 'tokens' | 'messages' | 'streak'
-type Period = '7d' | '30d' | 'all'
+import type { LeaderboardPeriod, LeaderboardSort } from '@/lib/leaderboard-types'
 
 interface SortBarProps {
-  sort: Sort
-  period: Period
-  onSort: (s: Sort) => void
-  onPeriod: (p: Period) => void
+  sort: LeaderboardSort
+  period: Exclude<LeaderboardPeriod, '7d'>
+  onSort: (s: LeaderboardSort) => void
+  onPeriod: (p: Exclude<LeaderboardPeriod, '7d'>) => void
 }
 
 export default function SortBar({ sort, period, onSort, onPeriod }: SortBarProps) {
@@ -38,24 +36,24 @@ export default function SortBar({ sort, period, onSort, onPeriod }: SortBarProps
   return (
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex items-center gap-1 bg-[var(--color-surface-2)] rounded-2xl border border-[var(--color-border)]/10 p-1">
-        {(['tokens', 'messages', 'streak'] as Sort[]).map((s) => (
+        {(['weekly', 'tokens', 'streak'] as LeaderboardSort[]).map((s) => (
           <button
             key={s}
             className={`${sort === s ? active : inactive}${justSelected === s ? ' btn-select' : ''}`}
             onClick={() => selectWithPop(s, () => onSort(s))}
           >
-            {s === 'tokens' ? 'Tokens' : s === 'messages' ? 'Messages' : 'Streak'}
+            {s === 'weekly' ? (period === 'week' ? 'Weekly Score' : 'Score') : s === 'tokens' ? 'Tokens' : 'Streak'}
           </button>
         ))}
       </div>
       <div className="flex items-center gap-1 bg-[var(--color-surface-2)] rounded-2xl border border-[var(--color-border)]/10 p-1">
-        {(['7d', '30d', 'all'] as Period[]).map((p) => (
+        {(['week', '30d', 'all'] as Exclude<LeaderboardPeriod, '7d'>[]).map((p) => (
           <button
             key={p}
             className={`${period === p ? active : inactive}${justSelected === p ? ' btn-select' : ''}`}
             onClick={() => selectWithPop(p, () => onPeriod(p))}
           >
-            {p === 'all' ? 'All time' : p}
+            {p === 'week' ? 'This week' : p === 'all' ? 'All time' : '30 days'}
           </button>
         ))}
       </div>

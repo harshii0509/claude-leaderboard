@@ -11,6 +11,76 @@ async function createTempHome() {
   return mkdtemp(path.join(tmpdir(), 'claude-leaderboard-home-'))
 }
 
+async function createFakeSchedulerEnv(homeDir: string) {
+  const binDir = await mkdtemp(path.join(tmpdir(), 'claude-leaderboard-bin-'))
+  const unamePath = path.join(binDir, 'uname')
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    HOME: homeDir,
+    PATH: `${binDir}:${process.env.PATH ?? ''}`,
+  }
+
+  if (process.platform === 'darwin') {
+    const launchctlPath = path.join(binDir, 'launchctl')
+    await writeFile(
+      unamePath,
+      '#!/usr/bin/env bash\nprintf \'Darwin\\n\'\n',
+      'utf8',
+    )
+    await writeFile(
+      launchctlPath,
+      '#!/usr/bin/env bash\nexit 0\n',
+      'utf8',
+    )
+    await chmod(launchctlPath, 0o755)
+  } else {
+    const systemctlPath = path.join(binDir, 'systemctl')
+    await writeFile(
+      unamePath,
+      '#!/usr/bin/env bash\nprintf \'Linux\\n\'\n',
+      'utf8',
+    )
+    await writeFile(
+      systemctlPath,
+      `#!/usr/bin/env bash
+set -euo pipefail
+if [ "$1" = "--user" ]; then
+  shift
+fi
+STATE_FILE="$HOME/.claude/systemd-enabled"
+mkdir -p "$(dirname "$STATE_FILE")"
+case "$1" in
+  daemon-reload)
+    exit 0
+    ;;
+  enable)
+    touch "$STATE_FILE"
+    exit 0
+    ;;
+  is-enabled|is-active)
+    if [ -f "$STATE_FILE" ]; then
+      exit 0
+    fi
+    exit 1
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`,
+      'utf8',
+    )
+    await chmod(systemctlPath, 0o755)
+  }
+
+  await chmod(unamePath, 0o755)
+
+  return {
+    binDir,
+    env,
+  }
+}
+
 async function runCommand(command: string, args: string[], options: {
   cwd: string
   env: NodeJS.ProcessEnv
@@ -114,6 +184,7 @@ test('preflight failure does not consume the install token', async () => {
   await withInstallServer(async (baseUrl, state) => {
     const homeDir = await createTempHome()
     const claudeDir = path.join(homeDir, '.claude')
+    const tools = await createFakeSchedulerEnv(homeDir)
 
     try {
       await mkdir(claudeDir, { recursive: true })
@@ -122,7 +193,7 @@ test('preflight failure does not consume the install token', async () => {
       const script = buildInstallBootstrapScript(baseUrl, 'install-token')
       const result = await runCommand('bash', ['-s'], {
         cwd: process.cwd(),
-        env: { ...process.env, HOME: homeDir },
+        env: tools.env,
         input: script,
       })
 
@@ -131,6 +202,7 @@ test('preflight failure does not consume the install token', async () => {
       assert.equal(state.exchangeCount, 0)
     } finally {
       await chmod(claudeDir, 0o700).catch(() => {})
+      await rm(tools.binDir, { recursive: true, force: true })
       await rm(homeDir, { recursive: true, force: true })
     }
   })
@@ -140,12 +212,13 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
   await withInstallServer(async (baseUrl) => {
     const homeDir = await createTempHome()
     const scriptFile = path.join(homeDir, 'install.sh')
+    const tools = await createFakeSchedulerEnv(homeDir)
 
     try {
       await writeFile(scriptFile, buildInstallBootstrapScript(baseUrl, 'install-token-1'), 'utf8')
       let result = await runCommand('bash', [scriptFile], {
         cwd: process.cwd(),
-        env: { ...process.env, HOME: homeDir },
+        env: tools.env,
       })
 
       assert.equal(result.status, 0, result.stderr)
@@ -156,15 +229,23 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
       const settingsPath = path.join(homeDir, '.claude', 'settings.json')
       await stat(syncScriptPath)
       await stat(configPath)
+      if (process.platform === 'darwin') {
+        await stat(path.join(homeDir, 'Library', 'LaunchAgents', 'com.claude-leaderboard.sync.plist'))
+      } else {
+        await stat(path.join(homeDir, '.config', 'systemd', 'user', 'claude-leaderboard-sync.timer'))
+        await stat(path.join(homeDir, '.config', 'systemd', 'user', 'claude-leaderboard-sync.service'))
+      }
       const settings = JSON.parse(await readFile(settingsPath, 'utf8'))
       assert.equal(settings.hooks.Stop[0].hooks[0].command, `python3 ${syncScriptPath}`)
+      assert.match(result.stdout, /Background scheduler: (launchd|systemd)/)
 
       result = await runCommand('python3', [syncScriptPath, '--doctor'], {
         cwd: process.cwd(),
-        env: { ...process.env, HOME: homeDir },
+        env: tools.env,
       })
       assert.equal(result.status, 0, result.stderr)
       assert.match(result.stdout, /Doctor check passed/)
+      assert.match(result.stdout, /Background scheduler: (launchd|systemd)/)
 
       const projectDir = path.join(homeDir, '.claude', 'projects', 'demo')
       await mkdir(projectDir, { recursive: true })
@@ -191,20 +272,23 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
 
       result = await runCommand('python3', [syncScriptPath, '--dry-run'], {
         cwd: process.cwd(),
-        env: { ...process.env, HOME: homeDir },
+        env: tools.env,
       })
       assert.equal(result.status, 0, result.stderr)
       const dryRun = JSON.parse(result.stdout)
       assert.equal(dryRun.event_count, 1)
+      assert.match(String(dryRun.scheduler.mode), /launchd|systemd/)
+      assert.equal(dryRun.scheduler.healthy, true)
 
       await writeFile(scriptFile, buildInstallBootstrapScript(baseUrl, 'install-token-2'), 'utf8')
       result = await runCommand('bash', [scriptFile], {
         cwd: process.cwd(),
-        env: { ...process.env, HOME: homeDir },
+        env: tools.env,
       })
       assert.equal(result.status, 0, result.stderr)
       assert.match(result.stdout, /upgrade complete/)
     } finally {
+      await rm(tools.binDir, { recursive: true, force: true })
       await rm(homeDir, { recursive: true, force: true })
     }
   })
@@ -214,6 +298,7 @@ test('bootstrap repairs malformed settings and keeps a backup', async () => {
   await withInstallServer(async (baseUrl) => {
     const homeDir = await createTempHome()
     const claudeDir = path.join(homeDir, '.claude')
+    const tools = await createFakeSchedulerEnv(homeDir)
 
     try {
       await mkdir(claudeDir, { recursive: true })
@@ -221,7 +306,7 @@ test('bootstrap repairs malformed settings and keeps a backup', async () => {
 
       const result = await runCommand('bash', ['-s'], {
         cwd: process.cwd(),
-        env: { ...process.env, HOME: homeDir },
+        env: tools.env,
         input: buildInstallBootstrapScript(baseUrl, 'install-token-3'),
       })
 
@@ -233,6 +318,7 @@ test('bootstrap repairs malformed settings and keeps a backup', async () => {
       const settings = JSON.parse(await readFile(path.join(claudeDir, 'settings.json'), 'utf8'))
       assert.ok(settings.hooks.Stop.length > 0)
     } finally {
+      await rm(tools.binDir, { recursive: true, force: true })
       await rm(homeDir, { recursive: true, force: true })
     }
   })

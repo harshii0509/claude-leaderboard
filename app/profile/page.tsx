@@ -3,6 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import StatCard from '@/components/StatCard'
 import ActivityHeatmap from '@/components/ActivityHeatmap'
+import ProfileShareButton from '@/components/ProfileShareButton'
 import DeleteAccountButton from './DeleteAccountButton'
 import { computeStreaks } from '@/lib/leaderboard-math'
 import { canCurrentUserSelfDelete, requireActiveSession } from '@/lib/access'
@@ -157,6 +158,9 @@ export default async function ProfilePage() {
                 {syncLabel}
               </span>
             )}
+          </div>
+          <div className="ml-auto self-start">
+            <ProfileShareButton />
           </div>
         </div>
 

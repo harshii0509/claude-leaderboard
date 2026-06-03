@@ -15,6 +15,7 @@ import re
 import sqlite3
 import socket
 import ssl
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -26,22 +27,50 @@ CONFIG_FILE = CLAUDE_DIR / "sync_config.json"
 CACHE_FILE = CLAUDE_DIR / "sync_cache.json"
 SETTINGS_FILE = CLAUDE_DIR / "settings.json"
 EXPECTED_SCRIPT_PATH = CLAUDE_DIR / "sync.py"
+CRON_SYNC_WRAPPER = CLAUDE_DIR / "sync-cron.sh"
 CODEX_DIR = Path.home() / ".codex"
 CODEX_LOG_DB = CODEX_DIR / "logs_2.sqlite"
+MACOS_LAUNCH_AGENT_LABEL = "com.claude-leaderboard.sync"
+MACOS_LAUNCH_AGENT_FILE = Path.home() / "Library" / "LaunchAgents" / f"{MACOS_LAUNCH_AGENT_LABEL}.plist"
+LINUX_SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
+LINUX_SYSTEMD_SERVICE_NAME = "claude-leaderboard-sync.service"
+LINUX_SYSTEMD_TIMER_NAME = "claude-leaderboard-sync.timer"
+LINUX_SYSTEMD_SERVICE_FILE = LINUX_SYSTEMD_USER_DIR / LINUX_SYSTEMD_SERVICE_NAME
+LINUX_SYSTEMD_TIMER_FILE = LINUX_SYSTEMD_USER_DIR / LINUX_SYSTEMD_TIMER_NAME
+CRON_SYNC_TAG = "claude-leaderboard-sync"
 SCHEMA_VERSION = 2
-SCRIPT_VERSION = "2.2.0"
+SCRIPT_VERSION = "2.3.0"
 MAX_EVENTS_PER_BATCH = 5000
 
 CODEX_FIELD_PATTERNS = {
-    "thread_id": re.compile(r"(?:thread\.id|thread_id)=([0-9a-f-]{8,})"),
-    "turn_id": re.compile(r"turn\.id=([0-9a-f-]{8,})"),
-    "model": re.compile(r"\bmodel=([A-Za-z0-9._:-]+)"),
-    "input_tokens": re.compile(r"codex\.turn\.token_usage\.input_tokens=(\d+)"),
-    "cached_input_tokens": re.compile(r"codex\.turn\.token_usage\.cached_input_tokens=(\d+)"),
-    "output_tokens": re.compile(r"codex\.turn\.token_usage\.output_tokens=(\d+)"),
-    "reasoning_output_tokens": re.compile(r"codex\.turn\.token_usage\.reasoning_output_tokens=(\d+)"),
-    "total_tokens": re.compile(r"codex\.turn\.token_usage\.total_tokens=(\d+)"),
-    "op": re.compile(r'codex\.op="([^"]+)"'),
+    "thread_id": [
+        re.compile(r'(?:thread\.id|thread_id)(?:=|:\s*)"?([A-Za-z0-9._:-]{8,})"?'),
+    ],
+    "turn_id": [
+        re.compile(r'(?:turn\.id|turn_id)(?:=|:\s*)"?([A-Za-z0-9._:-]{8,})"?'),
+    ],
+    "model": [
+        re.compile(r'\bmodel(?:=|:\s*)"?([A-Za-z0-9._:-]+)"?'),
+    ],
+    "input_tokens": [
+        re.compile(r"codex\.turn\.token_usage\.input_tokens(?:=|:\s*)(\d+)"),
+    ],
+    "cached_input_tokens": [
+        re.compile(r"codex\.turn\.token_usage\.cached_input_tokens(?:=|:\s*)(\d+)"),
+    ],
+    "output_tokens": [
+        re.compile(r"codex\.turn\.token_usage\.output_tokens(?:=|:\s*)(\d+)"),
+    ],
+    "reasoning_output_tokens": [
+        re.compile(r"codex\.turn\.token_usage\.reasoning_output_tokens(?:=|:\s*)(\d+)"),
+    ],
+    "total_tokens": [
+        re.compile(r"codex\.turn\.token_usage\.total_tokens(?:=|:\s*)(\d+)"),
+    ],
+    "op": [
+        re.compile(r'codex\.op(?:=|:\s*)"([^"]+)"'),
+        re.compile(r"codex\.op(?:=|:\s*)([A-Za-z0-9._:-]+)"),
+    ],
 }
 
 
@@ -270,27 +299,116 @@ def chunked(items, size):
 
 
 def extract_codex_field(name, text, default=None):
-    pattern = CODEX_FIELD_PATTERNS[name]
-    match = pattern.search(text)
-    if not match:
-        return default
-    return match.group(1)
+    patterns = CODEX_FIELD_PATTERNS[name]
+    for pattern in patterns:
+        match = pattern.search(text)
+        if match:
+            return match.group(1)
+    return default
+
+
+def detect_runtime_platform():
+    if sys.platform == "darwin":
+        return "darwin"
+    if sys.platform.startswith("linux"):
+        return "linux"
+    return "other"
+
+
+def safe_run(command):
+    try:
+        return subprocess.run(command, capture_output=True, text=True, check=False)
+    except OSError:
+        return None
+
+
+def inspect_scheduler():
+    platform = detect_runtime_platform()
+    if platform == "darwin":
+        installed = MACOS_LAUNCH_AGENT_FILE.exists()
+        return {
+            "platform": "darwin",
+            "mode": "launchd",
+            "installed": installed,
+            "healthy": installed,
+            "details": str(MACOS_LAUNCH_AGENT_FILE),
+        }
+
+    if platform == "linux":
+        if LINUX_SYSTEMD_SERVICE_FILE.exists() and LINUX_SYSTEMD_TIMER_FILE.exists():
+            enabled = False
+            active = False
+            systemctl = safe_run(["systemctl", "--user", "is-enabled", LINUX_SYSTEMD_TIMER_NAME])
+            if systemctl is not None:
+                enabled = systemctl.returncode == 0
+            active_cmd = safe_run(["systemctl", "--user", "is-active", LINUX_SYSTEMD_TIMER_NAME])
+            if active_cmd is not None:
+                active = active_cmd.returncode == 0
+            return {
+                "platform": "linux",
+                "mode": "systemd",
+                "installed": True,
+                "healthy": enabled or active,
+                "details": str(LINUX_SYSTEMD_TIMER_FILE),
+            }
+
+        cron_line = None
+        crontab_result = safe_run(["crontab", "-l"])
+        if crontab_result is not None and crontab_result.returncode == 0:
+            for line in crontab_result.stdout.splitlines():
+                if CRON_SYNC_TAG in line:
+                    cron_line = line
+                    break
+
+        installed = CRON_SYNC_WRAPPER.exists() and cron_line is not None
+        return {
+            "platform": "linux",
+            "mode": "cron",
+            "installed": installed,
+            "healthy": installed,
+            "details": str(CRON_SYNC_WRAPPER) if installed else "cron fallback not installed",
+        }
+
+    return {
+        "platform": platform,
+        "mode": "unsupported",
+        "installed": False,
+        "healthy": False,
+        "details": "automatic background sync is only supported on macOS and Linux",
+    }
+
+
+def fresh_codex_diagnostics():
+    return {
+        "db_found": CODEX_LOG_DB.exists(),
+        "rows_scanned": 0,
+        "events_emitted": 0,
+        "last_event_timestamp": None,
+        "latest_row_id": None,
+    }
 
 
 def iter_codex_events(state):
+    diagnostics = fresh_codex_diagnostics()
     if not CODEX_LOG_DB.exists():
-        return {}, None
+        return {}, None, diagnostics
 
     last_id = state.get("last_id", 0)
     if not isinstance(last_id, int) or last_id < 0:
         last_id = 0
 
     query = """
-        select id, ts, ts_nanos, feedback_log_body
+        select id, ts, coalesce(ts_nanos, 0), target, feedback_log_body
         from logs
         where id > ?
-          and target = 'opentelemetry_sdk'
-          and feedback_log_body like '%codex.turn.token_usage.input_tokens=%'
+          and feedback_log_body is not null
+          and (
+            feedback_log_body like '%codex.turn.token_usage.%'
+            or feedback_log_body like '%turn.id=%'
+            or feedback_log_body like '%turn_id=%'
+            or feedback_log_body like '%thread.id=%'
+            or feedback_log_body like '%thread_id=%'
+          )
         order by id asc
     """
 
@@ -299,9 +417,11 @@ def iter_codex_events(state):
 
     with sqlite3.connect(CODEX_LOG_DB) as conn:
         cursor = conn.execute(query, (last_id,))
-        for row_id, ts, ts_nanos, body in cursor:
+        for row_id, ts, ts_nanos, target, body in cursor:
             max_id = max(max_id, row_id)
             text = body or ""
+            diagnostics["rows_scanned"] += 1
+            diagnostics["latest_row_id"] = max_id
 
             turn_id = extract_codex_field("turn_id", text)
             thread_id = extract_codex_field("thread_id", text)
@@ -333,12 +453,18 @@ def iter_codex_events(state):
                 "output_tokens": output_tokens + reasoning_output_tokens,
                 "cache_creation_input_tokens": 0,
                 "cache_read_input_tokens": cached_input_tokens,
-                "stop_reason": extract_codex_field("op", text, "user_input"),
-                "source_path": str(CODEX_LOG_DB),
+                "stop_reason": extract_codex_field("op", text, target or "user_input"),
+                "source_path": f"{CODEX_LOG_DB}#row-{row_id}",
                 "source": "codex",
             }
 
-    return events, {"last_id": max_id}
+    if events:
+        diagnostics["events_emitted"] = len(events)
+        diagnostics["last_event_timestamp"] = max(
+            event["event_timestamp"] for event in events.values()
+        )
+
+    return events, {"last_id": max_id}, diagnostics
 
 
 def collect_events(cache):
@@ -354,15 +480,15 @@ def collect_events(cache):
             for event_id, event in file_events.items():
                 events[event_id] = event
 
-    codex_events, codex_state = iter_codex_events(cache.get("codex", {}))
+    codex_events, codex_state, codex_diagnostics = iter_codex_events(cache.get("codex", {}))
     for event_id, event in codex_events.items():
         events[event_id] = event
 
-    return list(events.values()), next_files, codex_state
+    return list(events.values()), next_files, codex_state, codex_diagnostics
 
 
 def sync_once(api_url, sync_token, cache):
-    ordered_events, next_files, codex_state = collect_events(cache)
+    ordered_events, next_files, codex_state, codex_diagnostics = collect_events(cache)
     server_generation = cache.get("sync_generation")
     batches = list(chunked(ordered_events, MAX_EVENTS_PER_BATCH)) or [[]]
 
@@ -372,7 +498,7 @@ def sync_once(api_url, sync_token, cache):
         if isinstance(generation, int):
             server_generation = generation
 
-    return next_files, codex_state, server_generation
+    return next_files, codex_state, server_generation, codex_diagnostics
 
 
 def hook_present():
@@ -395,6 +521,9 @@ def hook_present():
 
 def run_doctor(quiet=False):
     config = load_config()
+    scheduler = inspect_scheduler()
+    codex_cache = load_cache().get("codex", {})
+    _, _, codex_diagnostics = iter_codex_events(codex_cache)
     checks = [
         ("Claude directory exists", CLAUDE_DIR.exists()),
         ("Installed script exists", EXPECTED_SCRIPT_PATH.exists()),
@@ -404,6 +533,7 @@ def run_doctor(quiet=False):
         ("api_url present", bool(config.get("api_url"))),
         ("settings.json exists", SETTINGS_FILE.exists()),
         ("Claude Stop hook present", hook_present()),
+        ("Background sync scheduler present", scheduler["healthy"]),
         ("~/.claude is writable", os.access(CLAUDE_DIR, os.W_OK)),
     ]
 
@@ -412,8 +542,13 @@ def run_doctor(quiet=False):
         for label, passed in checks:
             prefix = "[ok]" if passed else "[fail]"
             print(f"{prefix} {label}")
-        if CODEX_LOG_DB.exists():
+        print(f"[info] Background scheduler: {scheduler['mode']} ({scheduler['details']})")
+        if codex_diagnostics["db_found"]:
             print(f"[ok] Codex log source detected at {CODEX_LOG_DB}")
+            print(f"[info] Codex rows scanned: {codex_diagnostics['rows_scanned']}")
+            print(f"[info] Codex events emitted: {codex_diagnostics['events_emitted']}")
+            if codex_diagnostics["last_event_timestamp"]:
+                print(f"[info] Latest Codex event: {codex_diagnostics['last_event_timestamp']}")
         else:
             print(f"[info] Codex log source not found at {CODEX_LOG_DB}")
         print(f"[info] Script version: {SCRIPT_VERSION}")
@@ -428,16 +563,18 @@ def run_doctor(quiet=False):
 
 
 def run_dry_run():
-    load_config()
+    config = load_config()
     cache = load_cache()
-    ordered_events, next_files, codex_state = collect_events(cache)
+    ordered_events, next_files, codex_state, codex_diagnostics = collect_events(cache)
     summary = {
         "script_version": SCRIPT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "event_count": len(ordered_events),
         "claude_sources": len(next_files),
         "codex_state_present": codex_state is not None,
-        "api_url": load_config().get("api_url", "http://localhost:3000/api/sync"),
+        "codex": codex_diagnostics,
+        "scheduler": inspect_scheduler(),
+        "api_url": config.get("api_url", "http://localhost:3000/api/sync"),
     }
     print(json.dumps(summary, indent=2))
 
@@ -449,7 +586,7 @@ def run_sync():
 
     cache = load_cache()
     cached_generation = cache.get("sync_generation")
-    next_files, codex_state, server_generation = sync_once(api_url, sync_token, cache)
+    next_files, codex_state, server_generation, _ = sync_once(api_url, sync_token, cache)
 
     if (
         isinstance(cached_generation, int)
@@ -457,7 +594,7 @@ def run_sync():
         and server_generation != cached_generation
     ):
         cache = fresh_cache(server_generation)
-        next_files, codex_state, server_generation = sync_once(api_url, sync_token, cache)
+        next_files, codex_state, server_generation, _ = sync_once(api_url, sync_token, cache)
 
     cache["files"] = next_files
     if codex_state is not None:

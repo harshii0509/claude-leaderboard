@@ -3,7 +3,17 @@ import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import type { AuthProviderOption } from '@/lib/auth-providers'
 
-export default function SignInButton({ providers }: { providers: AuthProviderOption[] }) {
+export default function SignInButton({
+  providers,
+  callbackUrl = '/',
+  containerClassName = '',
+  buttonClassName = '',
+}: {
+  providers: AuthProviderOption[]
+  callbackUrl?: string
+  containerClassName?: string
+  buttonClassName?: string
+}) {
   const [pending, setPending] = useState(false)
 
   useEffect(() => {
@@ -30,17 +40,17 @@ export default function SignInButton({ providers }: { providers: AuthProviderOpt
       : `Sign in (${providers.map((provider) => provider.label).join(' / ')})`
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2 ${containerClassName}`.trim()}>
       {providers.map((provider) => (
         <button
           key={provider.id}
           onClick={() => {
             if (pending) return
             setPending(true)
-            signIn(provider.id, { callbackUrl: '/' })
+            signIn(provider.id, { callbackUrl })
           }}
           disabled={pending}
-          className="game-btn text-sm px-4 py-2 text-black font-bold gap-2 flex items-center disabled:opacity-60"
+          className={`game-btn text-sm px-4 py-2 text-black font-bold gap-2 flex items-center disabled:opacity-60 ${buttonClassName}`.trim()}
           aria-label={`Sign in with ${provider.label}`}
           title={buttonLabel}
         >

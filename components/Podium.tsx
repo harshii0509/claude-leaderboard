@@ -3,26 +3,11 @@
 import Image from 'next/image'
 import { useEffect } from 'react'
 import { playPodium } from '@/lib/audio'
-
-export interface LeaderboardEntry {
-  user_id: string
-  name: string
-  image: string | null
-  total_tokens: number
-  total_input_tokens: number
-  total_output_tokens: number
-  total_cache_creation_input_tokens: number
-  total_cache_read_input_tokens: number
-  total_messages: number
-  total_sessions: number
-  current_streak: number
-  longest_streak: number
-  models_used: Record<string, number>
-  last_synced_at: string | null
-}
+import type { LeaderboardEntry } from '@/lib/leaderboard-types'
 
 interface PodiumProps {
   top3: LeaderboardEntry[]
+  metric?: 'weekly' | 'tokens'
 }
 
 const MEDALS = [
@@ -64,7 +49,7 @@ function fmt(n: number) {
   return String(n)
 }
 
-export default function Podium({ top3 }: PodiumProps) {
+export default function Podium({ top3, metric = 'tokens' }: PodiumProps) {
   useEffect(() => {
     const t = setTimeout(playPodium, 300)
     return () => clearTimeout(t)
@@ -112,7 +97,7 @@ export default function Podium({ top3 }: PodiumProps) {
               {entry.name.split(' ')[0]}
             </p>
             <p className="text-xs text-white/70 mb-2 text-center font-bold tabular-nums relative z-10">
-              {fmt(entry.total_tokens)}
+              {metric === 'weekly' ? `Score ${fmt(entry.weekly_score)}` : fmt(entry.total_tokens)}
             </p>
 
             {/* Podium block */}

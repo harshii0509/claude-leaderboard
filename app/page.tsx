@@ -1,13 +1,19 @@
 import { auth } from '@/lib/auth'
 import LeaderboardClient from '@/components/LeaderboardClient'
-import Link from 'next/link'
-import AudioToggle from '@/components/AudioToggle'
-import SignOutButton from '@/components/SignOutButton'
-import SignInButton from '@/components/SignInButton'
 import ErrorToast from '@/components/ErrorToast'
-import { getLeaderboardData } from '@/lib/leaderboard'
+import { getLeaderboardView } from '@/lib/leaderboard'
 import { getEnabledAuthProviderOptions } from '@/lib/auth-providers'
 import { getAccessDeniedMessage, type DomainRestrictionReason } from '@/lib/auth-domain'
+import AppHeader from '@/components/AppHeader'
+import JoinRail from '@/components/JoinRail'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getHomeRedirectPath, isUserOnboardingEligible } from '@/lib/onboarding'
+import {
+  getRequestOriginFromHeaders,
+  isLikelyMobileUserAgent,
+  resolveAppUrl,
+} from '@/lib/request-context'
 
 export default async function HomePage({
   searchParams,
@@ -18,18 +24,30 @@ export default async function HomePage({
   const errorCode = typeof params?.error === 'string' ? params.error : null
   const accessDeniedReason =
     typeof params?.reason === 'string' ? (params.reason as DomainRestrictionReason) : null
+  const headerStore = await headers()
+  const appUrl = resolveAppUrl(getRequestOriginFromHeaders(headerStore))
+  const session = await auth()
+
+  if (session?.user?.id) {
+    const redirectPath = getHomeRedirectPath({
+      onboardingEligible: await isUserOnboardingEligible(session.user.id),
+      isMobile: isLikelyMobileUserAgent(headerStore.get('user-agent')),
+    })
+
+    if (redirectPath) {
+      redirect(redirectPath)
+    }
+  }
+
   const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN, accessDeniedReason, {
     provider: typeof params?.provider === 'string' ? params.provider : null,
     emailDomain: typeof params?.email_domain === 'string' ? params.email_domain : null,
     hostedDomain: typeof params?.hosted_domain === 'string' ? params.hosted_domain : null,
     emailVerified: typeof params?.email_verified === 'string' ? params.email_verified : null,
   })
-  const [session, leaderboardResult] = await Promise.all([
-    auth(),
-    getLeaderboardData('tokens', 'all')
-      .then((data) => ({ data, failed: false }))
-      .catch(() => ({ data: [], failed: true })),
-  ])
+  const leaderboardResult = await getLeaderboardView('weekly', 'week')
+    .then((data) => ({ data, failed: false }))
+    .catch(() => ({ data: null, failed: true }))
   const authProviders = getEnabledAuthProviderOptions()
 
   return (
@@ -47,42 +65,19 @@ export default async function HomePage({
           zIndex: 0,
         }}
       />
-      <header className="relative z-10 py-4 px-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div>
-            <h1
-              className="text-2xl text-white tracking-tight leading-tight text-balance"
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 600,
-                textShadow: '0px 1px 0px rgba(0,0,50,0.25)',
-              }}
-            >
-              Claude Leaderboard
-            </h1>
-            <p className="text-xs text-white/65 mt-0.5 font-bold">Track your team&apos;s Claude Code usage</p>
-          </div>
-          <nav className="flex items-center gap-2">
-            {session ? (
-              <>
-                <Link href="/profile" className="game-btn-ghost text-sm px-3 py-1.5 text-white font-bold">
-                  Profile
-                </Link>
-                <Link href="/setup" className="game-btn-ghost text-sm px-3 py-1.5 text-white font-bold">
-                  Setup
-                </Link>
-                <SignOutButton />
-              </>
-            ) : (
-              <SignInButton providers={authProviders} />
-            )}
-            <AudioToggle />
-          </nav>
-        </div>
-      </header>
+      <AppHeader signedIn={Boolean(session)} authProviders={authProviders} />
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 pb-12">
-        <LeaderboardClient initialData={leaderboardResult.data} initialLoadFailed={leaderboardResult.failed} />
+      <main className="relative z-10 max-w-6xl mx-auto px-4 pt-6 pb-12 md:pt-7">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            <LeaderboardClient
+              initialData={leaderboardResult.data}
+              initialLoadFailed={leaderboardResult.failed}
+              signedIn={Boolean(session)}
+            />
+          </div>
+          <JoinRail appUrl={appUrl} />
+        </div>
       </main>
       <ErrorToast error={errorCode} accessDeniedMessage={accessDeniedMessage} />
     </div>

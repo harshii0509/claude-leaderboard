@@ -144,8 +144,8 @@ At least one auth provider must be configured. Google remains the default path u
 
 1. Users sign in with Google and visit the **Setup** page
 2. They run a one-line curl command or an inspect-before-run variant from the Setup page
-3. The installer preflights the local shell, downloads `sync.py`, then exchanges a short-lived install token for that user's long-lived sync credential and stores it locally in `~/.claude/sync_config.json`
-4. After every Claude Code session, the hook runs `sync.py`, which incrementally parses new finalized usage events from `~/.claude/projects/` and Codex turn telemetry from `~/.codex/logs_2.sqlite`, then POSTs raw events to your deployment
+3. The installer preflights the local shell, downloads `sync.py`, installs the Claude Stop hook plus a background scheduler, then exchanges a short-lived install token for that user's long-lived sync credential and stores it locally in `~/.claude/sync_config.json`
+4. After every Claude Code session, the hook runs `sync.py`, while the background scheduler keeps Codex-only activity moving by periodically rerunning that same script. `sync.py` incrementally parses new finalized usage events from `~/.claude/projects/` and Codex turn telemetry from `~/.codex/logs_2.sqlite`, then POSTs raw events to your deployment
 5. The server validates those events, stores them idempotently, and computes the official leaderboard totals, streaks, sessions, and model breakdowns
 6. The leaderboard updates automatically
 
@@ -215,8 +215,9 @@ That refresh does three things:
 - switches them to the new raw-event sync contract
 - adds Codex usage collection if `~/.codex/logs_2.sqlite` is present
 - re-registers the automatic Claude `Stop` hook if needed
+- installs or refreshes the background scheduler that keeps Codex-only activity syncing
 
-After that one-time reinstall, syncing continues automatically after each Claude session.
+After that one-time reinstall, syncing continues automatically after each Claude session and during background Codex-only periods.
 
 For local verification and troubleshooting, the installed sync script now also supports:
 

@@ -4,15 +4,13 @@ import { buildInstallCommands } from '@/lib/install-bootstrap'
 import CopyButton from './CopyButton'
 import SetupModal from './SetupModal'
 import { requireActiveSession } from '@/lib/access'
+import { getRequestOriginFromHeaders, resolveAppUrl } from '@/lib/request-context'
 
 export default async function SetupPage() {
   const { session } = await requireActiveSession()
 
   const headerStore = await headers()
-  const forwardedProto = headerStore.get('x-forwarded-proto')
-  const forwardedHost = headerStore.get('x-forwarded-host') ?? headerStore.get('host')
-  const requestOrigin = forwardedHost ? `${forwardedProto ?? 'https'}://${forwardedHost}` : null
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? requestOrigin ?? 'http://localhost:3000'
+  const appUrl = resolveAppUrl(getRequestOriginFromHeaders(headerStore))
   let token: string | null = null
 
   try {
@@ -35,8 +33,8 @@ export default async function SetupPage() {
       <SetupModal>
         {/* Description */}
         <p className="text-sm text-[var(--color-muted)] leading-relaxed -mt-1">
-          Run the one-line command below to install the Claude Stop hook on your machine.
-          The installer now preflights your shell, safely upgrades existing installs, and verifies the local setup before it exits.
+          Run the one-line command below to install shared local capture for Claude Code and Codex on your machine.
+          The installer preflights your shell, safely upgrades existing installs, wires automatic sync, and verifies the local setup before it exits.
         </p>
 
         {/* Install command */}
@@ -82,11 +80,12 @@ export default async function SetupPage() {
             <li>Downloads <code className="text-[var(--color-text)] font-mono">sync.py</code> and writes config files atomically</li>
             <li>Exchanges a short-lived install token for your personal sync credential only after preflight succeeds</li>
             <li>Backs up and refreshes the Claude <strong className="text-[var(--color-text)]">Stop hook</strong> in <code className="text-[var(--color-text)] font-mono">~/.claude/settings.json</code></li>
+            <li>Installs a background scheduler so Codex-only activity still syncs even when Claude is closed</li>
             <li>Runs a local health check before it exits</li>
           </ol>
           <p className="text-sm text-[var(--color-muted)]">
             After installation, Claude will run <code className="text-[var(--color-text)] font-mono">python3 ~/.claude/sync.py</code> automatically at the end of every session.
-            The same script also reads Codex usage from <code className="text-[var(--color-text)] font-mono">~/.codex/logs_2.sqlite</code> when present.
+            The same script also watches Codex usage in <code className="text-[var(--color-text)] font-mono">~/.codex/logs_2.sqlite</code>, and the background scheduler keeps that stream moving even if you only used Codex.
           </p>
           <p className="text-sm text-[var(--color-muted)]">
             Need to inspect or troubleshoot the local install later? Use{' '}

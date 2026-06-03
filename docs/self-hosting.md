@@ -208,13 +208,14 @@ For each teammate:
 1. They sign in.
 2. They open `/setup`.
 3. They run the one-line install command.
-4. Claude begins auto-syncing after each session.
+4. Claude begins auto-syncing after each session, and the background scheduler keeps Codex-only activity syncing too.
 
 The installer is TTY-aware and safe to rerun. It will:
 
 - detect whether the machine is doing a fresh install, upgrade, or repair
 - preflight `bash`, `curl`, `python3`, and a writable `~/.claude`
 - refresh the Claude Stop hook idempotently
+- install or refresh the background Codex fallback scheduler
 - run a local health check before it exits
 
 ## Ownership and member management

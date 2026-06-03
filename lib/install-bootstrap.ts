@@ -30,6 +30,16 @@ CLAUDE_DIR="\${HOME}/.claude"
 SYNC_SCRIPT="\${CLAUDE_DIR}/sync.py"
 CONFIG_FILE="\${CLAUDE_DIR}/sync_config.json"
 SETTINGS_FILE="\${CLAUDE_DIR}/settings.json"
+CRON_SYNC_WRAPPER="\${CLAUDE_DIR}/sync-cron.sh"
+MACOS_LAUNCH_AGENT_LABEL="com.claude-leaderboard.sync"
+MACOS_LAUNCH_AGENT_DIR="\${HOME}/Library/LaunchAgents"
+MACOS_LAUNCH_AGENT_FILE="\${MACOS_LAUNCH_AGENT_DIR}/\${MACOS_LAUNCH_AGENT_LABEL}.plist"
+LINUX_SYSTEMD_USER_DIR="\${HOME}/.config/systemd/user"
+LINUX_SYSTEMD_SERVICE_NAME="claude-leaderboard-sync.service"
+LINUX_SYSTEMD_TIMER_NAME="claude-leaderboard-sync.timer"
+LINUX_SYSTEMD_SERVICE_FILE="\${LINUX_SYSTEMD_USER_DIR}/\${LINUX_SYSTEMD_SERVICE_NAME}"
+LINUX_SYSTEMD_TIMER_FILE="\${LINUX_SYSTEMD_USER_DIR}/\${LINUX_SYSTEMD_TIMER_NAME}"
+CRON_SYNC_TAG="claude-leaderboard-sync"
 TMP_DIR="$(mktemp -d "\${TMPDIR:-/tmp}/claude-leaderboard.XXXXXX")"
 TMP_SYNC_SCRIPT="\${TMP_DIR}/sync.py"
 TMP_CONFIG_FILE="\${TMP_DIR}/sync_config.json"
@@ -40,6 +50,8 @@ SETTINGS_BACKUP=""
 INSTALL_MODE="fresh install"
 SETTINGS_STATE="missing"
 HOOK_STATUS="pending"
+PLATFORM="unknown"
+SCHEDULER_MODE="pending"
 IS_TTY=0
 if [ -t 1 ]; then
   IS_TTY=1
@@ -161,6 +173,23 @@ raise SystemExit(0 if found else 1)
 PYEOF
 }
 
+detect_scheduler_status() {
+  case "\${PLATFORM}" in
+    darwin)
+      [ -f "\${MACOS_LAUNCH_AGENT_FILE}" ]
+      ;;
+    linux-systemd)
+      [ -f "\${LINUX_SYSTEMD_SERVICE_FILE}" ] && [ -f "\${LINUX_SYSTEMD_TIMER_FILE}" ]
+      ;;
+    linux-cron)
+      [ -f "\${CRON_SYNC_WRAPPER}" ] && crontab -l 2>/dev/null | grep -Fq "\${CRON_SYNC_TAG}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 preflight() {
   section "Preflight"
 
@@ -170,6 +199,27 @@ preflight() {
   ok "curl available"
   command -v python3 >/dev/null 2>&1 || fail "python3 is required"
   ok "python3 available"
+
+  local uname_value
+  uname_value="$(uname -s 2>/dev/null || true)"
+  case "\${uname_value}" in
+    Darwin)
+      PLATFORM="darwin"
+      ;;
+    Linux)
+      if command -v systemctl >/dev/null 2>&1; then
+        PLATFORM="linux-systemd"
+      elif command -v crontab >/dev/null 2>&1; then
+        PLATFORM="linux-cron"
+      else
+        fail "Linux installs require systemctl --user or crontab for automatic Codex capture"
+      fi
+      ;;
+    *)
+      fail "Automatic Claude + Codex capture is currently supported on macOS and Linux"
+      ;;
+  esac
+  ok "Scheduler platform detected: \${PLATFORM}"
 
   mkdir -p "\${CLAUDE_DIR}"
   local probe="\${CLAUDE_DIR}/.write-probe"
@@ -201,6 +251,7 @@ PYEOF
   local has_sync_script=0
   local has_config=0
   local has_hook=0
+  local has_scheduler=0
   if [ -f "\${SYNC_SCRIPT}" ]; then
     has_sync_script=1
   fi
@@ -210,10 +261,13 @@ PYEOF
   if detect_hook_status; then
     has_hook=1
   fi
+  if detect_scheduler_status; then
+    has_scheduler=1
+  fi
 
-  if [ "\${has_sync_script}" -eq 1 ] && [ "\${has_config}" -eq 1 ] && [ "\${has_hook}" -eq 1 ] && [ "\${SETTINGS_STATE}" = "valid" ]; then
+  if [ "\${has_sync_script}" -eq 1 ] && [ "\${has_config}" -eq 1 ] && [ "\${has_hook}" -eq 1 ] && [ "\${has_scheduler}" -eq 1 ] && [ "\${SETTINGS_STATE}" = "valid" ]; then
     INSTALL_MODE="upgrade"
-  elif [ "\${has_sync_script}" -eq 1 ] || [ "\${has_config}" -eq 1 ] || [ "\${has_hook}" -eq 1 ] || [ "\${SETTINGS_STATE}" = "malformed" ]; then
+  elif [ "\${has_sync_script}" -eq 1 ] || [ "\${has_config}" -eq 1 ] || [ "\${has_hook}" -eq 1 ] || [ "\${has_scheduler}" -eq 1 ] || [ "\${SETTINGS_STATE}" = "malformed" ]; then
     INSTALL_MODE="repair"
   fi
   ok "Install mode detected: \${INSTALL_MODE}"
@@ -312,6 +366,82 @@ commit_install() {
   mv "\${TMP_SETTINGS_FILE}" "\${SETTINGS_FILE}"
 }
 
+install_scheduler() {
+  case "\${PLATFORM}" in
+    darwin)
+      SCHEDULER_MODE="launchd"
+      mkdir -p "\${MACOS_LAUNCH_AGENT_DIR}"
+      cat > "\${MACOS_LAUNCH_AGENT_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>\${MACOS_LAUNCH_AGENT_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>\${SYNC_SCRIPT}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>600</integer>
+  <key>StandardOutPath</key>
+  <string>\${CLAUDE_DIR}/scheduler.log</string>
+  <key>StandardErrorPath</key>
+  <string>\${CLAUDE_DIR}/scheduler.log</string>
+</dict>
+</plist>
+EOF
+      launchctl unload "\${MACOS_LAUNCH_AGENT_FILE}" >/dev/null 2>&1 || true
+      launchctl load -w "\${MACOS_LAUNCH_AGENT_FILE}"
+      ;;
+    linux-systemd)
+      SCHEDULER_MODE="systemd"
+      mkdir -p "\${LINUX_SYSTEMD_USER_DIR}"
+      cat > "\${LINUX_SYSTEMD_SERVICE_FILE}" <<EOF
+[Unit]
+Description=Claude Leaderboard background sync
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env python3 \${SYNC_SCRIPT}
+EOF
+      cat > "\${LINUX_SYSTEMD_TIMER_FILE}" <<EOF
+[Unit]
+Description=Run Claude Leaderboard background sync every 10 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Unit=\${LINUX_SYSTEMD_SERVICE_NAME}
+
+[Install]
+WantedBy=timers.target
+EOF
+      systemctl --user daemon-reload
+      systemctl --user enable --now "\${LINUX_SYSTEMD_TIMER_NAME}"
+      ;;
+    linux-cron)
+      SCHEDULER_MODE="cron"
+      cat > "\${CRON_SYNC_WRAPPER}" <<EOF
+#!/usr/bin/env bash
+python3 "\${SYNC_SCRIPT}" >/dev/null 2>&1 || true
+EOF
+      chmod +x "\${CRON_SYNC_WRAPPER}"
+      local cron_tmp="\${TMP_DIR}/crontab"
+      { crontab -l 2>/dev/null || true; } | grep -Fv "\${CRON_SYNC_TAG}" > "\${cron_tmp}" || true
+      printf '*/10 * * * * "%s" # %s\n' "\${CRON_SYNC_WRAPPER}" "\${CRON_SYNC_TAG}" >> "\${cron_tmp}"
+      crontab "\${cron_tmp}"
+      ;;
+    *)
+      fail "Unsupported scheduler platform: \${PLATFORM}"
+      ;;
+  esac
+}
+
 verify_install() {
   python3 "\${SYNC_SCRIPT}" --health-check
 }
@@ -326,6 +456,8 @@ print_summary() {
   note "  - \${SYNC_SCRIPT}"
   note "  - \${CONFIG_FILE}"
   note "  - \${SETTINGS_FILE}"
+  note "Claude hook: installed"
+  note "Background scheduler: \${SCHEDULER_MODE}"
   if [ -n "\${SETTINGS_BACKUP}" ]; then
     note "Backup: \${SETTINGS_BACKUP}"
   fi
@@ -333,13 +465,14 @@ print_summary() {
 }
 
 section "Claude Leaderboard installer"
-note "This installer will preflight your machine, update local sync files, refresh the Claude Stop hook, and verify the result."
+note "This installer will preflight your machine, update the shared Claude + Codex collector, refresh the Claude Stop hook, install background sync, and verify the result."
 
 preflight
 run_step "Downloading sync.py" download_sync_script || fail "Could not download sync.py"
 run_step "Exchanging install token" exchange_install_token || fail "Could not exchange install token"
 run_step "Preparing Claude settings hook" prepare_settings || fail "Could not prepare Claude settings"
 run_step "Writing files atomically" commit_install || fail "Could not write installer files"
+run_step "Installing background sync scheduler" install_scheduler || fail "Could not install background sync scheduler"
 run_step "Running local health check" verify_install || fail "Install finished writing files, but local verification failed"
 print_summary
 `

@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
 import ActivityHeatmap from './ActivityHeatmap'
-import { LeaderboardEntry } from './Podium'
+import type { LeaderboardEntry } from '@/lib/leaderboard-types'
 
 interface UserProfileModalProps {
   entry: LeaderboardEntry

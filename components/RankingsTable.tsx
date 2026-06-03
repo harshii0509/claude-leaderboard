@@ -2,12 +2,14 @@
 
 import Image from 'next/image'
 import { motion, useReducedMotion } from 'framer-motion'
-import { LeaderboardEntry } from './Podium'
 import { playHover } from '@/lib/audio'
+import type { LeaderboardEntry } from '@/lib/leaderboard-types'
 
 interface RankingsTableProps {
   entries: LeaderboardEntry[]
   onUserClick: (entry: LeaderboardEntry) => void
+  showRankDelta?: boolean
+  showWeeklyScore?: boolean
 }
 
 function fmt(n: number) {
@@ -43,7 +45,18 @@ const rowVariants = {
   }),
 }
 
-export default function RankingsTable({ entries, onUserClick }: RankingsTableProps) {
+function formatRankDelta(delta: number) {
+  if (delta > 0) return { label: `+${delta}`, tone: 'up' as const, symbol: '▲' }
+  if (delta < 0) return { label: String(delta), tone: 'down' as const, symbol: '▼' }
+  return { label: '0', tone: 'flat' as const, symbol: '•' }
+}
+
+export default function RankingsTable({
+  entries,
+  onUserClick,
+  showRankDelta = false,
+  showWeeklyScore = false,
+}: RankingsTableProps) {
   const shouldReduce = useReducedMotion() ?? false
 
   return (
@@ -53,6 +66,12 @@ export default function RankingsTable({ entries, onUserClick }: RankingsTablePro
           <tr className="bg-[var(--color-surface-2)] border-b border-[var(--color-border)]/10">
             <th className="text-left px-4 py-3 text-[var(--color-muted)] font-bold w-12">#</th>
             <th className="text-left px-4 py-3 text-[var(--color-muted)] font-bold">User</th>
+            {showRankDelta && (
+              <th className="text-right px-4 py-3 text-[var(--color-muted)] font-bold hidden sm:table-cell">Move</th>
+            )}
+            {showWeeklyScore && (
+              <th className="text-right px-4 py-3 text-[var(--color-muted)] font-bold hidden md:table-cell">Score</th>
+            )}
             <th className="text-right px-4 py-3 text-[var(--color-muted)] font-bold">Tokens</th>
             <th className="text-right px-4 py-3 text-[var(--color-muted)] font-bold hidden sm:table-cell">Messages</th>
             <th className="text-right px-4 py-3 text-[var(--color-muted)] font-bold hidden md:table-cell">Sessions</th>
@@ -64,6 +83,7 @@ export default function RankingsTable({ entries, onUserClick }: RankingsTablePro
             const rank = idx + 1
             const badge = RANK_BADGE[rank]
             const ringClass = RING_CLASS[rank] ?? 'rank-default'
+            const rankDelta = formatRankDelta(entry.rank_delta)
             return (
               <motion.tr
                 key={entry.user_id}
@@ -105,6 +125,29 @@ export default function RankingsTable({ entries, onUserClick }: RankingsTablePro
                     <span className="font-bold text-[var(--color-text)]">{entry.name}</span>
                   </div>
                 </td>
+                {showRankDelta && (
+                  <td className="px-4 py-3 text-right hidden sm:table-cell">
+                    <span
+                      className={`inline-flex min-w-11 items-center justify-center gap-1 rounded-full px-2.5 py-1 text-xs font-black ${
+                        rankDelta.tone === 'up'
+                          ? 'bg-[var(--color-accent)]/25 text-[var(--color-accent-border)]'
+                          : rankDelta.tone === 'down'
+                            ? 'bg-[var(--color-red)]/15 text-[var(--color-red-border)]'
+                            : 'bg-[var(--color-surface-2)] text-[var(--color-muted)]'
+                      }`}
+                    >
+                      <span aria-hidden="true">{rankDelta.symbol}</span>
+                      {rankDelta.label}
+                    </span>
+                  </td>
+                )}
+                {showWeeklyScore && (
+                  <td className="px-4 py-3 text-right hidden md:table-cell">
+                    <span className="inline-flex min-w-14 items-center justify-center rounded-full bg-[var(--color-accent)]/18 px-2.5 py-1 text-xs font-black text-[var(--color-accent-border)]">
+                      {entry.weekly_score}
+                    </span>
+                  </td>
+                )}
                 <td className="px-4 py-3 text-right font-bold tabular-nums text-[var(--color-text)]">
                   {fmt(entry.total_tokens)}
                 </td>
@@ -132,7 +175,7 @@ export default function RankingsTable({ entries, onUserClick }: RankingsTablePro
           })}
           {entries.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-12 text-center text-[var(--color-muted)] font-bold">
+              <td colSpan={6 + (showRankDelta ? 1 : 0) + (showWeeklyScore ? 1 : 0)} className="px-4 py-12 text-center text-[var(--color-muted)] font-bold">
                 No data yet. Be the first to sync!
               </td>
             </tr>
