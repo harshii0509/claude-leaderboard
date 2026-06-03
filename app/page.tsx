@@ -8,6 +8,15 @@ import ErrorToast from '@/components/ErrorToast'
 import { getLeaderboardData } from '@/lib/leaderboard'
 import { getEnabledAuthProviderOptions } from '@/lib/auth-providers'
 import { getAccessDeniedMessage, type DomainRestrictionReason } from '@/lib/auth-domain'
+import JoinRail from '@/components/JoinRail'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { getHomeRedirectPath, isUserOnboardingEligible } from '@/lib/onboarding'
+import {
+  getRequestOriginFromHeaders,
+  isLikelyMobileUserAgent,
+  resolveAppUrl,
+} from '@/lib/request-context'
 
 export default async function HomePage({
   searchParams,
@@ -18,6 +27,8 @@ export default async function HomePage({
   const errorCode = typeof params?.error === 'string' ? params.error : null
   const accessDeniedReason =
     typeof params?.reason === 'string' ? (params.reason as DomainRestrictionReason) : null
+  const headerStore = await headers()
+  const appUrl = resolveAppUrl(getRequestOriginFromHeaders(headerStore))
   const accessDeniedMessage = getAccessDeniedMessage(process.env.ALLOWED_EMAIL_DOMAIN, accessDeniedReason, {
     provider: typeof params?.provider === 'string' ? params.provider : null,
     emailDomain: typeof params?.email_domain === 'string' ? params.email_domain : null,
@@ -31,6 +42,17 @@ export default async function HomePage({
       .catch(() => ({ data: [], failed: true })),
   ])
   const authProviders = getEnabledAuthProviderOptions()
+
+  if (session?.user?.id) {
+    const redirectPath = getHomeRedirectPath({
+      onboardingEligible: await isUserOnboardingEligible(session.user.id),
+      isMobile: isLikelyMobileUserAgent(headerStore.get('user-agent')),
+    })
+
+    if (redirectPath) {
+      redirect(redirectPath)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-background)]">
@@ -81,8 +103,16 @@ export default async function HomePage({
         </div>
       </header>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-4 pb-12">
-        <LeaderboardClient initialData={leaderboardResult.data} initialLoadFailed={leaderboardResult.failed} />
+      <main className="relative z-10 max-w-6xl mx-auto px-4 pb-12 pt-2 md:pt-4">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="min-w-0 flex-1">
+            <LeaderboardClient
+              initialData={leaderboardResult.data}
+              initialLoadFailed={leaderboardResult.failed}
+            />
+          </div>
+          <JoinRail appUrl={appUrl} />
+        </div>
       </main>
       <ErrorToast error={errorCode} accessDeniedMessage={accessDeniedMessage} />
     </div>

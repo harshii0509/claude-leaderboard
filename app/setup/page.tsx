@@ -4,15 +4,13 @@ import { buildInstallCommands } from '@/lib/install-bootstrap'
 import CopyButton from './CopyButton'
 import SetupModal from './SetupModal'
 import { requireActiveSession } from '@/lib/access'
+import { getRequestOriginFromHeaders, resolveAppUrl } from '@/lib/request-context'
 
 export default async function SetupPage() {
   const { session } = await requireActiveSession()
 
   const headerStore = await headers()
-  const forwardedProto = headerStore.get('x-forwarded-proto')
-  const forwardedHost = headerStore.get('x-forwarded-host') ?? headerStore.get('host')
-  const requestOrigin = forwardedHost ? `${forwardedProto ?? 'https'}://${forwardedHost}` : null
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? requestOrigin ?? 'http://localhost:3000'
+  const appUrl = resolveAppUrl(getRequestOriginFromHeaders(headerStore))
   let token: string | null = null
 
   try {
