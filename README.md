@@ -9,6 +9,18 @@ This repo now serves two purposes:
 - the battle-tested product currently running for your internal team
 - a self-hosted open-source distribution other teams can deploy themselves
 
+## Maintainer workflow
+
+The repo is maintained with a three-branch flow:
+
+- `experimentation` for local-only product exploration
+- `internal` for the live Juspay deployment on Vercel
+- `main` for curated OSS-safe releases
+
+Daily product work should start on `experimentation`, get validated on localhost, move to `internal` when it is ready for the live Juspay app, and only then be promoted to `main` if it is generic enough for self-hosted teams.
+
+Vercel is treated as production-only for this repo. The `internal` branch is the Vercel production branch, and production secrets stay scoped to the `Production` environment only.
+
 ## Features
 
 - **Team leaderboard** — rank members by tokens, messages, or streak
@@ -106,6 +118,8 @@ The easiest way to deploy is Vercel:
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/harshii0509/claude-leaderboard)
 
 After deploying, add your environment variables in the Vercel dashboard under **Settings → Environment Variables**, then set `NEXT_PUBLIC_APP_URL` to your production URL.
+
+If you are maintaining the live Juspay instance from this repo, keep the real hosted deployment attached to the `internal` branch. `experimentation` is intended for local testing, and `main` is intended for OSS-safe releases rather than direct day-to-day production work.
 
 If you want to self-host outside Vercel, this repo also supports a Docker-based deployment path using Next.js standalone output. See [docs/self-hosting.md](docs/self-hosting.md).
 
