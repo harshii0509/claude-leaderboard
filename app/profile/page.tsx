@@ -6,19 +6,40 @@ import ActivityHeatmap from '@/components/ActivityHeatmap'
 import DeleteAccountButton from './DeleteAccountButton'
 import { computeStreaks } from '@/lib/leaderboard-math'
 import { canCurrentUserSelfDelete, requireActiveSession } from '@/lib/access'
+import {
+  getUsageModelLabel,
+  getUsageProviderLabel,
+  getUsageSourceLabel,
+  type UsageBreakdownModel,
+  type UsageBreakdownProvider,
+  type UsageBreakdownSource,
+} from '@/lib/usage-breakdown-shared'
+import { getUserUsageBreakdown } from '@/lib/usage-breakdown'
+import { isMissingUsageBreakdownError } from '@/lib/usage-breakdown-errors'
 
 async function getUserStats(userId: string) {
-  const { data: stats } = await supabaseAdmin
-    .from('user_stats')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
+  const [{ data: stats }, { data: activity }, usageBreakdownResult] = await Promise.all([
+    supabaseAdmin
+      .from('user_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .single(),
+    supabaseAdmin
+      .from('daily_activity')
+      .select('date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, messages, sessions')
+      .eq('user_id', userId)
+      .order('date', { ascending: true }),
+    getUserUsageBreakdown(userId).then(
+      (usageBreakdown) => ({ usageBreakdown }),
+      (error) => {
+        if (isMissingUsageBreakdownError(error)) {
+          return { usageBreakdown: null }
+        }
 
-  const { data: activity } = await supabaseAdmin
-    .from('daily_activity')
-    .select('date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, messages, sessions')
-    .eq('user_id', userId)
-    .order('date', { ascending: true })
+        throw error
+      },
+    ),
+  ])
 
   const allActivity = activity ?? []
   const streaks = computeStreaks(allActivity.map((row) => row.date))
@@ -27,6 +48,7 @@ async function getUserStats(userId: string) {
     stats: stats
       ? {
           ...stats,
+          usage_breakdown: usageBreakdownResult.usageBreakdown,
           current_streak: streaks.current,
           longest_streak: Math.max(stats.longest_streak ?? 0, streaks.longest),
         }
