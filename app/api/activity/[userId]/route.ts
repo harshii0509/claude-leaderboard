@@ -10,41 +10,46 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const { userId } = await params
+  try {
+    const { userId } = await params
 
-  if (!isUuid(userId)) {
-    return Response.json({ error: 'Invalid user id' }, { status: 400 })
+    if (!isUuid(userId)) {
+      return Response.json({ error: 'Invalid user id' }, { status: 400 })
+    }
+
+    const membership = await getInstanceMembership(userId)
+    if (!membership?.is_active) {
+      return Response.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { data: exists, error: existsError } = await supabaseAdmin
+      .from('user_stats')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (existsError) {
+      return Response.json({ error: existsError.message }, { status: 500 })
+    }
+
+    if (!exists) {
+      return Response.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const since = new Date()
+    since.setDate(since.getDate() - 365)
+
+    const { data, error } = await supabaseAdmin
+      .from('daily_activity')
+      .select('date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, messages, sessions')
+      .eq('user_id', userId)
+      .gte('date', since.toISOString().slice(0, 10))
+      .order('date', { ascending: true })
+
+    if (error) return Response.json({ error: error.message }, { status: 500 })
+    return Response.json(data ?? [])
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not load activity.'
+    return Response.json({ error: message }, { status: 500 })
   }
-
-  const membership = await getInstanceMembership(userId)
-  if (!membership?.is_active) {
-    return Response.json({ error: 'User not found' }, { status: 404 })
-  }
-
-  const { data: exists, error: existsError } = await supabaseAdmin
-    .from('user_stats')
-    .select('user_id')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (existsError) {
-    return Response.json({ error: existsError.message }, { status: 500 })
-  }
-
-  if (!exists) {
-    return Response.json({ error: 'User not found' }, { status: 404 })
-  }
-
-  const since = new Date()
-  since.setDate(since.getDate() - 365)
-
-  const { data, error } = await supabaseAdmin
-    .from('daily_activity')
-    .select('date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, messages, sessions')
-    .eq('user_id', userId)
-    .gte('date', since.toISOString().slice(0, 10))
-    .order('date', { ascending: true })
-
-  if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json(data ?? [])
 }
