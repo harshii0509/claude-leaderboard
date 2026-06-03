@@ -1,6 +1,10 @@
 import { revalidateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { getOrCreateUserWidgetSettings, updateUserWidgetSettings } from '@/lib/user-widget'
+import {
+  getUserWidgetSettingsUnavailableMessage,
+  isMissingUserWidgetSettingsError,
+} from '@/lib/user-widget-errors'
 import { isWidgetPreset, type WidgetPreset } from '@/lib/widget-types'
 
 interface WidgetUpdatePayload {
@@ -23,6 +27,13 @@ export async function GET() {
     const settings = await getOrCreateUserWidgetSettings(session.user.id)
     return Response.json({ settings })
   } catch (error) {
+    if (isMissingUserWidgetSettingsError(error)) {
+      return Response.json(
+        { error: getUserWidgetSettingsUnavailableMessage() },
+        { status: 503 },
+      )
+    }
+
     const message = error instanceof Error ? error.message : 'Could not load widget settings.'
     return Response.json({ error: message }, { status: 500 })
   }
@@ -83,6 +94,13 @@ export async function POST(request: Request) {
 
     return Response.json({ settings })
   } catch (error) {
+    if (isMissingUserWidgetSettingsError(error)) {
+      return Response.json(
+        { error: getUserWidgetSettingsUnavailableMessage() },
+        { status: 503 },
+      )
+    }
+
     const message = error instanceof Error ? error.message : 'Could not update widget settings.'
     return Response.json({ error: message }, { status: 500 })
   }

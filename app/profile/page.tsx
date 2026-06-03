@@ -11,6 +11,10 @@ import { computeStreaks } from '@/lib/leaderboard-math'
 import { canCurrentUserSelfDelete, requireActiveSession } from '@/lib/access'
 import { getOrCreateUserWidgetSettings } from '@/lib/user-widget'
 import {
+  getUserWidgetSettingsUnavailableMessage,
+  isMissingUserWidgetSettingsError,
+} from '@/lib/user-widget-errors'
+import {
   getUsageModelLabel,
   getUsageProviderLabel,
   getUsageSourceLabel,
@@ -82,10 +86,20 @@ export default async function ProfilePage() {
     canCurrentUserSelfDelete(),
   ])
 
-  const [{ stats, activity }, widgetSettings] = await Promise.all([
+  const [{ stats, activity }, widgetSettingsResult] = await Promise.all([
     getUserStats(session.user.id),
-    getOrCreateUserWidgetSettings(session.user.id),
+    getOrCreateUserWidgetSettings(session.user.id).then(
+      (settings) => ({ settings, unavailableMessage: null }),
+      (error) => {
+        if (isMissingUserWidgetSettingsError(error)) {
+          return { settings: null, unavailableMessage: getUserWidgetSettingsUnavailableMessage() }
+        }
+
+        throw error
+      },
+    ),
   ])
+  const { settings: widgetSettings, unavailableMessage: widgetUnavailableMessage } = widgetSettingsResult
 
   const status = syncStatus(stats?.last_synced_at ?? null)
   const syncLabel = relativeTime(stats?.last_synced_at ?? null)
@@ -209,13 +223,28 @@ export default async function ProfilePage() {
           <ActivityHeatmap activity={activity} />
         </div>
 
-        <ProfileWidgetPanel
-          initialSettings={widgetSettings}
-          displayName={session.user.name ?? session.user.email ?? 'Anonymous'}
-          image={session.user.image ?? null}
-          currentStreak={stats?.current_streak ?? 0}
-          activity={activity}
-        />
+        {widgetSettings ? (
+          <ProfileWidgetPanel
+            initialSettings={widgetSettings}
+            displayName={session.user.name ?? session.user.email ?? 'Anonymous'}
+            image={session.user.image ?? null}
+            currentStreak={stats?.current_streak ?? 0}
+            activity={activity}
+          />
+        ) : (
+          <div className="game-card p-5 flex flex-col gap-2">
+            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold">Widget sharing</p>
+            <h2 className="text-xl text-[var(--color-text)]" style={{ fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+              Widget publishing is temporarily unavailable
+            </h2>
+            <p className="text-sm text-[var(--color-muted)]">
+              {widgetUnavailableMessage ?? getUserWidgetSettingsUnavailableMessage()}
+            </p>
+            <p className="text-sm text-[var(--color-muted)]">
+              Apply the widget migration, then reload this page to enable embeds again.
+            </p>
+          </div>
+        )}
 
         {/* Usage breakdown */}
         {stats?.usage_breakdown?.sources?.length ? (
