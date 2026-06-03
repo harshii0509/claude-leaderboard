@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import ActivityHeatmap from './ActivityHeatmap'
+import { parseApiJsonResponse } from '@/lib/api-json-response'
 import {
   getUsageModelLabel,
   getUsageProviderLabel,
@@ -42,36 +43,60 @@ export default function DetailPanel({ userId }: DetailPanelProps) {
   const [models, setModels] = useState<ModelEntry[]>([])
   const [usageBreakdown, setUsageBreakdown] = useState<UsageBreakdown | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [actRes, statsRes] = await Promise.all([
-        fetch(`/api/activity/${userId}`),
-        fetch(`/api/user-stats/${userId}`),
-      ])
-      if (actRes.ok) setActivity(await actRes.json())
-      if (statsRes.ok) {
-        const stats = await statsRes.json() as UserStatsPayload
-        if (stats.usage_breakdown?.sources?.length) {
-          setUsageBreakdown(stats.usage_breakdown)
+      try {
+        const [actRes, statsRes] = await Promise.all([
+          fetch(`/api/activity/${userId}`),
+          fetch(`/api/user-stats/${userId}`),
+        ])
+        const [{ data: activityPayload, error: activityError }, { data: statsPayload, error: statsError }] = await Promise.all([
+          parseApiJsonResponse<DayData[]>(actRes, 'Failed to load activity'),
+          parseApiJsonResponse<UserStatsPayload>(statsRes, 'Failed to load profile stats'),
+        ])
+
+        if (activityError) throw new Error(activityError)
+        if (statsError) throw new Error(statsError)
+        if (!statsPayload) throw new Error('Profile stats response was empty.')
+
+        setActivity(activityPayload ?? [])
+        if (statsPayload.usage_breakdown?.sources?.length) {
+          setUsageBreakdown(statsPayload.usage_breakdown)
           setModels([])
         } else {
           setUsageBreakdown(null)
-          const mu = stats.models_used ?? {}
+          const mu = statsPayload.models_used ?? {}
           setModels(
             Object.entries(mu)
               .map(([model, count]) => ({ model, count: count as number }))
               .sort((a, b) => b.count - a.count)
           )
         }
+        setLoadError(null)
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Could not load this profile right now.')
+        setActivity([])
+        setUsageBreakdown(null)
+        setModels([])
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
   }, [userId])
 
   if (loading) {
     return <div className="py-4 px-6 text-[var(--color-muted)] text-sm font-bold">Loading...</div>
+  }
+
+  if (loadError) {
+    return (
+      <div className="px-6 py-4 bg-[var(--color-surface-2)] border-t border-[var(--color-border)]/15">
+        <p className="text-sm font-bold text-[var(--color-red)]">{loadError}</p>
+      </div>
+    )
   }
 
   const totalModelCount = models.reduce((s, m) => s + m.count, 0) || 1

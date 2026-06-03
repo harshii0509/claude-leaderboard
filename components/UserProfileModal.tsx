@@ -7,6 +7,7 @@ import type { CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import ActivityHeatmap from './ActivityHeatmap'
 import { LeaderboardEntry } from './Podium'
+import { parseApiJsonResponse } from '@/lib/api-json-response'
 import {
   getUsageModelLabel,
   getUsageProviderLabel,
@@ -109,27 +110,17 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
           fetch(`/api/activity/${entry.user_id}`),
           fetch(`/api/user-stats/${entry.user_id}`),
         ])
-        const activityPayload = await actRes.json()
-        const statsPayload = await statsRes.json()
+        const [{ data: activityPayload, error: activityError }, { data: statsPayload, error: statsError }] = await Promise.all([
+          parseApiJsonResponse<DayData[]>(actRes, 'Failed to load activity'),
+          parseApiJsonResponse<UserStatsPayload>(statsRes, 'Failed to load profile stats'),
+        ])
 
-        if (!actRes.ok) {
-          throw new Error(
-            activityPayload && typeof activityPayload.error === 'string'
-              ? activityPayload.error
-              : 'Failed to load activity'
-          )
-        }
+        if (activityError) throw new Error(activityError)
+        if (statsError) throw new Error(statsError)
+        if (!statsPayload) throw new Error('Profile stats response was empty.')
 
-        if (!statsRes.ok) {
-          throw new Error(
-            statsPayload && typeof statsPayload.error === 'string'
-              ? statsPayload.error
-              : 'Failed to load profile stats'
-          )
-        }
-
-        setActivity(activityPayload)
-        const stats = statsPayload as UserStatsPayload
+        setActivity(activityPayload ?? [])
+        const stats = statsPayload
         const breakdown = stats.usage_breakdown
         if (breakdown?.sources?.length) {
           setUsageBreakdown(breakdown)
