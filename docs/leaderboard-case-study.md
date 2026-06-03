@@ -41,7 +41,7 @@ That combination made the app hard to trust and hard to operate.
 
 The system now follows a more reliable separation of concerns:
 
-1. The local Python collector extracts raw usage facts from Claude and Codex.
+1. The local Python collector extracts raw usage facts from Claude, Codex, and OpenCode.
 2. The server validates and stores those facts idempotently.
 3. Derived leaderboard tables are rebuilt from raw events.
 4. Current streak is calculated live from daily activity, while longest streak remains a historical rollup.
@@ -58,7 +58,7 @@ The system now follows a more reliable separation of concerns:
 - Current streak now decays correctly even if a user stops syncing.
 - Global rescans can be requested without destructive data loss.
 - A full reset preserves users while allowing a clean replay from client history.
-- Claude and Codex usage flow through the same canonical scoring pipeline.
+- Claude, Codex, and OpenCode usage flow through the same canonical scoring pipeline.
 
 ## Key engineering decisions
 

@@ -33,7 +33,7 @@ const nunito = localFont({
 
 export const metadata: Metadata = {
   title: 'Claude Leaderboard',
-  description: 'Track your team\'s Claude Code usage',
+  description: 'Track your team\'s AI coding usage',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -82,7 +82,7 @@ export default async function HomePage({
             >
               Claude Leaderboard
             </h1>
-            <p className="text-xs text-white/65 mt-0.5 font-bold">Track your team&apos;s Claude Code usage</p>
+            <p className="text-xs text-white/65 mt-0.5 font-bold">Track your team&apos;s AI coding usage</p>
           </div>
           <nav className="flex items-center gap-2">
             {session ? (

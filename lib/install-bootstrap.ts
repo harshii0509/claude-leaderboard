@@ -336,7 +336,7 @@ print_summary() {
   fi
   if [ "\${INITIAL_SYNC_STATUS}" = "success" ]; then
     ok "Initial sync complete"
-    note "Any existing local Claude or Codex history has been uploaded."
+    note "Any existing local Claude, Codex, or OpenCode history has been uploaded."
   else
     warn "Initial sync did not complete"
     note "Your hook is installed. Run python3 ~/.claude/sync.py after fixing connectivity to upload local history."

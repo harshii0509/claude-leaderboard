@@ -30,7 +30,7 @@ export default function NotFound() {
               Claude Leaderboard
             </h1>
           </Link>
-          <p className="text-xs text-white/65 mt-0.5 font-bold">Track your team&apos;s Claude Code usage</p>
+          <p className="text-xs text-white/65 mt-0.5 font-bold">Track your team&apos;s AI coding usage</p>
         </div>
       </header>
 

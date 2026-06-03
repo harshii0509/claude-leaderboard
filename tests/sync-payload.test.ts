@@ -177,3 +177,28 @@ test('validateSyncPayload defaults source to claude when missing', () => {
   const result = validateSyncPayload(payload)
   assert.equal(result.events[0]?.source, 'claude')
 })
+
+test('validateSyncPayload accepts opencode as a valid source', () => {
+  const payload = buildPayload({
+    events: [
+      {
+        event_id: 'evt-opencode-1',
+        message_id: null,
+        session_id: 'opencode-session-1',
+        event_timestamp: '2026-06-02T09:30:00.000Z',
+        activity_date: '2026-06-02',
+        model: 'anthropic/claude-sonnet-4',
+        input_tokens: 25,
+        output_tokens: 14,
+        cache_creation_input_tokens: 4,
+        cache_read_input_tokens: 7,
+        stop_reason: 'session_total',
+        source_path: '/tmp/opencode.db',
+        source: 'opencode',
+      },
+    ],
+  })
+
+  const result = validateSyncPayload(payload)
+  assert.equal(result.events[0]?.source, 'opencode')
+})

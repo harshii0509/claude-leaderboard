@@ -61,8 +61,8 @@ export default async function WelcomePage() {
               <CopyButton text={appUrl} />
             </div>
             <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">
-              Open this on the computer where Claude Code or Codex already lives. We&apos;ll take
-              first-time users straight to setup there.
+              Open this on the computer where Claude Code, Codex, or OpenCode already
+              lives. We&apos;ll take first-time users straight to setup there.
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export default async function WelcomePage() {
             </div>
             <div className="rounded-[20px] border-2 border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 shadow-[0_5px_0_-2px_var(--color-border)]">
               <p className="text-sm font-bold text-[var(--color-text)]">
-                2. Run the single Claude + Codex setup command
+                2. Run the single setup command
               </p>
             </div>
             <div className="rounded-[20px] border-2 border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 shadow-[0_5px_0_-2px_var(--color-border)]">

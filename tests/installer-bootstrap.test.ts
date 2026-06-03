@@ -216,17 +216,19 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
   })
 })
 
-test('install performs an immediate first sync for existing Claude and Codex history', async () => {
+test('install performs an immediate first sync for existing Claude, Codex, and OpenCode history', async () => {
   await withInstallServer(async (baseUrl, state) => {
     const homeDir = await createTempHome()
     const scriptFile = path.join(homeDir, 'install.sh')
     const claudeProjectDir = path.join(homeDir, '.claude', 'projects', 'demo')
     const codexDir = path.join(homeDir, '.codex')
     const codexDbPath = path.join(codexDir, 'logs_2.sqlite')
+    const opencodeDbPath = path.join(homeDir, '.local', 'share', 'opencode', 'opencode.db')
 
     try {
       await mkdir(claudeProjectDir, { recursive: true })
       await mkdir(codexDir, { recursive: true })
+      await mkdir(path.dirname(opencodeDbPath), { recursive: true })
       await writeFile(
         path.join(claudeProjectDir, 'session.jsonl'),
         `${JSON.stringify({
@@ -278,6 +280,45 @@ conn.close()
       })
       assert.equal(createDb.status, 0, createDb.stderr)
 
+      const createOpenCodeDb = await runCommand('python3', ['-c', `
+import json, sqlite3, sys
+path = sys.argv[1]
+conn = sqlite3.connect(path)
+conn.execute("""
+CREATE TABLE session (
+  id TEXT PRIMARY KEY,
+  model TEXT,
+  time_created INTEGER NOT NULL,
+  time_updated INTEGER NOT NULL,
+  tokens_input INTEGER NOT NULL DEFAULT 0,
+  tokens_output INTEGER NOT NULL DEFAULT 0,
+  tokens_reasoning INTEGER NOT NULL DEFAULT 0,
+  tokens_cache_read INTEGER NOT NULL DEFAULT 0,
+  tokens_cache_write INTEGER NOT NULL DEFAULT 0
+)
+""")
+conn.execute(
+  "insert into session (id, model, time_created, time_updated, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  (
+    "opencode-session-1",
+    json.dumps({"id": "claude-sonnet-4", "providerID": "anthropic"}),
+    1748937600000,
+    1748941200000,
+    210,
+    90,
+    30,
+    15,
+    6,
+  ),
+)
+conn.commit()
+conn.close()
+      `, opencodeDbPath], {
+        cwd: process.cwd(),
+        env: { ...process.env, HOME: homeDir },
+      })
+      assert.equal(createOpenCodeDb.status, 0, createOpenCodeDb.stderr)
+
       await writeFile(scriptFile, buildInstallBootstrapScript(baseUrl, 'install-token-4'), 'utf8')
       const result = await runCommand('bash', [scriptFile], {
         cwd: process.cwd(),
@@ -294,11 +335,12 @@ conn.close()
           model: string
           input_tokens: number
           output_tokens: number
+          cache_creation_input_tokens?: number
           cache_read_input_tokens: number
         }>
       }
       assert.ok(payload.events)
-      assert.equal(payload.events?.length, 2)
+      assert.equal(payload.events?.length, 3)
 
       const claudeEvent = payload.events?.find((event) => event.source === 'claude')
       assert.deepEqual(
@@ -333,6 +375,26 @@ conn.close()
           input_tokens: 17455,
           output_tokens: 101,
           cache_read_input_tokens: 1536,
+        },
+      )
+
+      const opencodeEvent = payload.events?.find((event) => event.source === 'opencode')
+      assert.deepEqual(
+        opencodeEvent && {
+          source: opencodeEvent.source,
+          model: opencodeEvent.model,
+          input_tokens: opencodeEvent.input_tokens,
+          output_tokens: opencodeEvent.output_tokens,
+          cache_creation_input_tokens: opencodeEvent.cache_creation_input_tokens,
+          cache_read_input_tokens: opencodeEvent.cache_read_input_tokens,
+        },
+        {
+          source: 'opencode',
+          model: 'anthropic/claude-sonnet-4',
+          input_tokens: 210,
+          output_tokens: 120,
+          cache_creation_input_tokens: 6,
+          cache_read_input_tokens: 15,
         },
       )
     } finally {

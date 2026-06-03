@@ -1,5 +1,5 @@
 const MAX_EVENTS_PER_REQUEST = 20_000
-const ALLOWED_SOURCES = new Set(['claude', 'codex'])
+const ALLOWED_SOURCES = new Set(['claude', 'codex', 'opencode'])
 
 export interface SyncEvent {
   event_id: string
@@ -14,7 +14,7 @@ export interface SyncEvent {
   cache_read_input_tokens: number
   stop_reason: string | null
   source_path: string | null
-  source: 'claude' | 'codex'
+  source: 'claude' | 'codex' | 'opencode'
 }
 
 export interface SyncClientInfo {
@@ -57,7 +57,7 @@ function asOptionalString(value: unknown, field: string, maxLength = 512): strin
   return asString(value, field, maxLength)
 }
 
-function asSource(value: unknown): 'claude' | 'codex' {
+function asSource(value: unknown): 'claude' | 'codex' | 'opencode' {
   if (value == null) {
     return 'claude'
   }
@@ -67,7 +67,7 @@ function asSource(value: unknown): 'claude' | 'codex' {
     throw new Error('Invalid source')
   }
 
-  return source as 'claude' | 'codex'
+  return source as 'claude' | 'codex' | 'opencode'
 }
 
 function asIsoTimestamp(value: unknown, field: string): string {

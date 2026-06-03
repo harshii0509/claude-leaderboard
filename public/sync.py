@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Claude Code usage sync script.
+Local AI coding usage sync script.
 
 This collector is intentionally dumb about leaderboard scoring:
 it only extracts finalized usage events and uploads raw facts.
@@ -12,9 +12,11 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import socket
 import ssl
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -28,8 +30,9 @@ SETTINGS_FILE = CLAUDE_DIR / "settings.json"
 EXPECTED_SCRIPT_PATH = CLAUDE_DIR / "sync.py"
 CODEX_DIR = Path.home() / ".codex"
 CODEX_LOG_DB = CODEX_DIR / "logs_2.sqlite"
+OPENCODE_DEFAULT_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 SCHEMA_VERSION = 2
-SCRIPT_VERSION = "2.2.0"
+SCRIPT_VERSION = "2.3.0"
 MAX_EVENTS_PER_BATCH = 5000
 
 CODEX_FIELD_PATTERNS = {
@@ -50,7 +53,7 @@ def stderr(message: str):
 
 
 def fresh_cache(sync_generation=None):
-    cache = {"schema_version": SCHEMA_VERSION, "files": {}, "codex": {}}
+    cache = {"schema_version": SCHEMA_VERSION, "files": {}, "codex": {}, "opencode": {}}
     if sync_generation is not None:
         cache["sync_generation"] = sync_generation
     return cache
@@ -92,6 +95,8 @@ def load_cache():
         cache["files"] = {}
     if not isinstance(cache.get("codex"), dict):
         cache["codex"] = {}
+    if not isinstance(cache.get("opencode"), dict):
+        cache["opencode"] = {}
     if "sync_generation" in cache and not isinstance(cache.get("sync_generation"), int):
         cache.pop("sync_generation", None)
     return cache
@@ -277,6 +282,152 @@ def extract_codex_field(name, text, default=None):
     return match.group(1)
 
 
+def discover_opencode_db_paths():
+    candidates = []
+    opencode_cli = shutil.which("opencode")
+    if opencode_cli:
+        try:
+            result = subprocess.run(
+                [opencode_cli, "db", "path"],
+                capture_output=True,
+                check=True,
+                text=True,
+                timeout=10,
+            )
+            candidate = Path(result.stdout.strip()).expanduser()
+            if candidate.exists():
+                candidates.append(candidate)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    if OPENCODE_DEFAULT_DB.exists() and OPENCODE_DEFAULT_DB not in candidates:
+        candidates.append(OPENCODE_DEFAULT_DB)
+
+    return candidates
+
+
+def parse_opencode_model(value):
+    if not value:
+        return "unknown"
+
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return value.strip() or "unknown"
+
+    if not isinstance(value, dict):
+        return "unknown"
+
+    model_id = str(value.get("id") or "").strip()
+    provider_id = str(value.get("providerID") or "").strip()
+
+    if not model_id:
+        return provider_id or "unknown"
+
+    if provider_id and "/" not in model_id:
+        return f"{provider_id}/{model_id}"
+
+    return model_id
+
+
+def iter_opencode_events_from_db(db_path, state):
+    last_time = state.get("last_time", 0)
+    last_id = state.get("last_id", "")
+    if not isinstance(last_time, int) or last_time < 0:
+        last_time = 0
+    if not isinstance(last_id, str):
+        last_id = ""
+
+    query = """
+        select
+            id,
+            model,
+            time_created,
+            time_updated,
+            tokens_input,
+            tokens_output,
+            tokens_reasoning,
+            tokens_cache_read,
+            tokens_cache_write
+        from session
+        where coalesce(time_updated, time_created, 0) > ?
+           or (coalesce(time_updated, time_created, 0) = ? and id > ?)
+        order by coalesce(time_updated, time_created, 0) asc, id asc
+    """
+
+    events = {}
+    max_time = last_time
+    max_id = last_id
+    tzinfo = datetime.now().astimezone().tzinfo
+
+    with sqlite3.connect(db_path) as conn:
+        cursor = conn.execute(query, (last_time, last_time, last_id))
+        for row in cursor:
+            (
+                session_id,
+                raw_model,
+                time_created,
+                time_updated,
+                input_tokens,
+                output_tokens,
+                reasoning_tokens,
+                cache_read_tokens,
+                cache_write_tokens,
+            ) = row
+
+            event_time_ms = time_updated or time_created or 0
+            if not session_id or event_time_ms <= 0:
+                continue
+
+            total_tokens = (
+                int(input_tokens or 0)
+                + int(output_tokens or 0)
+                + int(reasoning_tokens or 0)
+                + int(cache_read_tokens or 0)
+                + int(cache_write_tokens or 0)
+            )
+            if total_tokens <= 0:
+                max_time = event_time_ms
+                max_id = session_id
+                continue
+
+            timestamp = datetime.fromtimestamp(event_time_ms / 1000, tz=tzinfo)
+            event_id = f"opencode:{session_id}"
+            events[event_id] = {
+                "event_id": event_id,
+                "message_id": None,
+                "session_id": session_id,
+                "event_timestamp": timestamp.isoformat(),
+                "activity_date": timestamp.date().isoformat(),
+                "model": parse_opencode_model(raw_model),
+                "input_tokens": int(input_tokens or 0),
+                "output_tokens": int(output_tokens or 0) + int(reasoning_tokens or 0),
+                "cache_creation_input_tokens": int(cache_write_tokens or 0),
+                "cache_read_input_tokens": int(cache_read_tokens or 0),
+                "stop_reason": "session_total",
+                "source_path": str(db_path),
+                "source": "opencode",
+            }
+            max_time = event_time_ms
+            max_id = session_id
+
+    return events, {"last_time": max_time, "last_id": max_id, "db_path": str(db_path)}
+
+
+def iter_opencode_events(state):
+    for db_path in discover_opencode_db_paths():
+        try:
+            return iter_opencode_events_from_db(db_path, state)
+        except sqlite3.OperationalError as exc:
+            error_text = str(exc).lower()
+            if "no such table" in error_text or "no such column" in error_text:
+                continue
+            raise
+
+    return {}, None
+
+
 def iter_codex_events(state):
     if not CODEX_LOG_DB.exists():
         return {}, None
@@ -358,11 +509,15 @@ def collect_events(cache):
     for event_id, event in codex_events.items():
         events[event_id] = event
 
-    return list(events.values()), next_files, codex_state
+    opencode_events, opencode_state = iter_opencode_events(cache.get("opencode", {}))
+    for event_id, event in opencode_events.items():
+        events[event_id] = event
+
+    return list(events.values()), next_files, codex_state, opencode_state
 
 
 def sync_once(api_url, sync_token, cache):
-    ordered_events, next_files, codex_state = collect_events(cache)
+    ordered_events, next_files, codex_state, opencode_state = collect_events(cache)
     server_generation = cache.get("sync_generation")
     batches = list(chunked(ordered_events, MAX_EVENTS_PER_BATCH)) or [[]]
 
@@ -372,7 +527,7 @@ def sync_once(api_url, sync_token, cache):
         if isinstance(generation, int):
             server_generation = generation
 
-    return next_files, codex_state, server_generation
+    return next_files, codex_state, opencode_state, server_generation
 
 
 def hook_present():
@@ -416,6 +571,11 @@ def run_doctor(quiet=False):
             print(f"[ok] Codex log source detected at {CODEX_LOG_DB}")
         else:
             print(f"[info] Codex log source not found at {CODEX_LOG_DB}")
+        opencode_paths = discover_opencode_db_paths()
+        if opencode_paths:
+            print(f"[ok] OpenCode session source detected at {opencode_paths[0]}")
+        else:
+            print(f"[info] OpenCode session source not found at {OPENCODE_DEFAULT_DB}")
         print(f"[info] Script version: {SCRIPT_VERSION}")
 
     if failures:
@@ -430,13 +590,14 @@ def run_doctor(quiet=False):
 def run_dry_run():
     load_config()
     cache = load_cache()
-    ordered_events, next_files, codex_state = collect_events(cache)
+    ordered_events, next_files, codex_state, opencode_state = collect_events(cache)
     summary = {
         "script_version": SCRIPT_VERSION,
         "schema_version": SCHEMA_VERSION,
         "event_count": len(ordered_events),
         "claude_sources": len(next_files),
         "codex_state_present": codex_state is not None,
+        "opencode_state_present": opencode_state is not None,
         "api_url": load_config().get("api_url", "http://localhost:3000/api/sync"),
     }
     print(json.dumps(summary, indent=2))
@@ -449,7 +610,7 @@ def run_sync():
 
     cache = load_cache()
     cached_generation = cache.get("sync_generation")
-    next_files, codex_state, server_generation = sync_once(api_url, sync_token, cache)
+    next_files, codex_state, opencode_state, server_generation = sync_once(api_url, sync_token, cache)
 
     if (
         isinstance(cached_generation, int)
@@ -457,18 +618,20 @@ def run_sync():
         and server_generation != cached_generation
     ):
         cache = fresh_cache(server_generation)
-        next_files, codex_state, server_generation = sync_once(api_url, sync_token, cache)
+        next_files, codex_state, opencode_state, server_generation = sync_once(api_url, sync_token, cache)
 
     cache["files"] = next_files
     if codex_state is not None:
         cache["codex"] = codex_state
+    if opencode_state is not None:
+        cache["opencode"] = opencode_state
     if isinstance(server_generation, int):
         cache["sync_generation"] = server_generation
     save_cache(cache)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Sync local Claude and Codex usage to Claude Leaderboard.")
+    parser = argparse.ArgumentParser(description="Sync local Claude, Codex, and OpenCode usage to Claude Leaderboard.")
     parser.add_argument("--doctor", action="store_true", help="Verify local install health and hook wiring.")
     parser.add_argument("--dry-run", action="store_true", help="Parse local activity without uploading anything.")
     parser.add_argument("--health-check", action="store_true", help="Run a concise installer-facing verification.")
