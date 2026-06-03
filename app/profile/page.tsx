@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/db'
 import Image from 'next/image'
 import Link from 'next/link'
+import type { CSSProperties } from 'react'
 import StatCard from '@/components/StatCard'
 import ActivityHeatmap from '@/components/ActivityHeatmap'
 import DeleteAccountButton from './DeleteAccountButton'
@@ -89,14 +90,6 @@ export default async function ProfilePage() {
   ])
 
   const { stats, activity } = await getUserStats(session.user.id)
-
-  const models: Array<{ model: string; count: number }> = stats?.models_used
-    ? Object.entries(stats.models_used)
-        .map(([model, count]) => ({ model, count: count as number }))
-        .sort((a, b) => b.count - a.count)
-    : []
-
-  const totalModelCount = models.reduce((s, m) => s + m.count, 0) || 1
 
   const status = syncStatus(stats?.last_synced_at ?? null)
   const syncLabel = relativeTime(stats?.last_synced_at ?? null)
@@ -217,28 +210,92 @@ export default async function ProfilePage() {
           <ActivityHeatmap activity={activity} />
         </div>
 
-        {/* Model breakdown */}
-        {models.length > 0 && (
+        {/* Usage breakdown */}
+        {stats?.usage_breakdown?.sources?.length ? (
+          <div className="game-card p-5">
+            <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Usage breakdown</p>
+            <div className="flex flex-col gap-5">
+              {stats.usage_breakdown.sources.map((source: UsageBreakdownSource) => (
+                <div
+                  key={source.source}
+                  className="rounded-2xl border border-[var(--color-surface-2)] bg-[var(--color-surface-2)]/40 px-4 py-4"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--color-text)]">{getUsageSourceLabel(source.source)}</p>
+                      <p className="text-xs text-[var(--color-muted)]">
+                        {fmt(source.total_sessions)} sessions • {fmt(source.total_events)} events
+                      </p>
+                    </div>
+                    <p className="text-sm font-mono text-[var(--color-text)]">{fmt(source.total_tokens)} tokens</p>
+                  </div>
+
+                  <div className="flex flex-col gap-4">
+                    {source.providers.map((provider: UsageBreakdownProvider) => (
+                      <div key={`${source.source}:${provider.provider}`} className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs uppercase tracking-wider font-bold text-[var(--color-muted)]">
+                            {getUsageProviderLabel(provider.provider)}
+                          </p>
+                          <p className="text-xs font-mono text-[var(--color-muted)]">
+                            {fmt(provider.total_tokens)} tokens
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          {provider.models.map((model: UsageBreakdownModel, index: number) => {
+                            const pct = source.total_tokens > 0
+                              ? Math.max(2, Math.round((model.total_tokens / source.total_tokens) * 100))
+                              : 0
+                            return (
+                              <div key={`${source.source}:${provider.provider}:${model.model}`} className="flex items-center gap-3 text-sm">
+                                <span className="w-40 truncate text-[var(--color-muted)]" title={model.model}>
+                                  {getUsageModelLabel(model.model)}
+                                </span>
+                                <div className="game-progress-track flex-1 h-4">
+                                  <div
+                                    className="game-progress-fill model-bar bg-[var(--color-accent)]"
+                                    style={{ width: `${pct}%`, '--bar-index': index } as CSSProperties}
+                                  />
+                                </div>
+                                <span className="w-12 text-right text-[var(--color-muted)] tabular-nums">{pct}%</span>
+                                <span className="w-16 text-right text-[var(--color-text)] font-mono">{fmt(model.total_tokens)}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : stats?.models_used && Object.keys(stats.models_used).length > 0 ? (
           <div className="game-card p-5">
             <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Models used</p>
             <div className="flex flex-col gap-3">
-              {models.map((m) => {
-                const pct = Math.round((m.count / totalModelCount) * 100)
-                const shortName = m.model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
-                return (
-                  <div key={m.model} className="flex items-center gap-3 text-sm">
-                    <span className="w-36 truncate text-[var(--color-muted)]" title={m.model}>{shortName}</span>
-                    <div className="flex-1 bg-[var(--color-surface-2)] rounded-full h-2">
-                      <div className="bg-[var(--color-accent)] h-2 rounded-full" style={{ width: `${pct}%` }} />
+              {Object.entries(stats.models_used)
+                .map(([model, count]) => ({ model, count: count as number }))
+                .sort((a, b) => b.count - a.count)
+                .map((m, index, allModels) => {
+                  const totalModelCount = allModels.reduce((sum, model) => sum + model.count, 0) || 1
+                  const pct = Math.round((m.count / totalModelCount) * 100)
+                  const shortName = m.model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
+                  return (
+                    <div key={m.model} className="flex items-center gap-3 text-sm">
+                      <span className="w-36 truncate text-[var(--color-muted)]" title={m.model}>{shortName}</span>
+                      <div className="flex-1 bg-[var(--color-surface-2)] rounded-full h-2">
+                        <div className="bg-[var(--color-accent)] h-2 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="w-10 text-right text-[var(--color-muted)]">{pct}%</span>
+                      <span className="w-16 text-right text-[var(--color-text)] font-mono">{fmt(m.count)}</span>
                     </div>
-                    <span className="w-10 text-right text-[var(--color-muted)]">{pct}%</span>
-                    <span className="w-16 text-right text-[var(--color-text)] font-mono">{fmt(m.count)}</span>
-                  </div>
-                )
-              })}
+                  )
+                })}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Data & Privacy */}
         <div className="game-card p-5">
