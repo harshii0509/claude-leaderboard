@@ -3,9 +3,19 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import type { CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import ActivityHeatmap from './ActivityHeatmap'
 import { LeaderboardEntry } from './Podium'
+import {
+  getUsageModelLabel,
+  getUsageProviderLabel,
+  getUsageSourceLabel,
+  type UsageBreakdown,
+  type UsageBreakdownModel,
+  type UsageBreakdownProvider,
+  type UsageBreakdownSource,
+} from '@/lib/usage-breakdown-shared'
 
 interface UserProfileModalProps {
   entry: LeaderboardEntry
@@ -26,6 +36,11 @@ interface DayData {
 interface ModelEntry {
   model: string
   count: number
+}
+
+interface UserStatsPayload {
+  models_used?: Record<string, number> | null
+  usage_breakdown?: UsageBreakdown | null
 }
 
 const RING_CLASS: Record<number, string> = { 1: 'rank-1', 2: 'rank-2', 3: 'rank-3' }
@@ -73,6 +88,7 @@ const statsItem = {
 export default function UserProfileModal({ entry, rank, onClose }: UserProfileModalProps) {
   const [activity, setActivity] = useState<DayData[]>([])
   const [models, setModels] = useState<ModelEntry[]>([])
+  const [usageBreakdown, setUsageBreakdown] = useState<UsageBreakdown | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const shouldReduce = useReducedMotion() ?? false
@@ -113,12 +129,20 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
         }
 
         setActivity(activityPayload)
-        const mu = statsPayload.models_used ?? {}
-        setModels(
-          Object.entries(mu)
-            .map(([model, count]) => ({ model, count: count as number }))
-            .sort((a, b) => b.count - a.count)
-        )
+        const stats = statsPayload as UserStatsPayload
+        const breakdown = stats.usage_breakdown
+        if (breakdown?.sources?.length) {
+          setUsageBreakdown(breakdown)
+          setModels([])
+        } else {
+          setUsageBreakdown(null)
+          const mu = stats.models_used ?? {}
+          setModels(
+            Object.entries(mu)
+              .map(([model, count]) => ({ model, count: count as number }))
+              .sort((a, b) => b.count - a.count)
+          )
+        }
         setLoadError(null)
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : 'Could not load this profile right now.')
@@ -302,7 +326,7 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
                     <div className="game-progress-track flex-1 h-4">
                       <div
                         className="game-progress-fill model-bar"
-                        style={{ width: `${pct}%`, background: color, '--bar-index': i } as React.CSSProperties}
+                        style={{ width: `${pct}%`, background: color, '--bar-index': i } as CSSProperties}
                       />
                     </div>
                     <span className="w-16 text-right text-[var(--color-muted)] tabular-nums font-bold">{fmt(value)}</span>
@@ -317,7 +341,62 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
             <div className="w-full text-sm text-[var(--color-muted)] font-bold animate-pulse py-2">Loading details...</div>
           ) : (
             <>
-              {models.length > 0 && (
+              {usageBreakdown?.sources?.length ? (
+                <div className="w-full border-t border-[var(--color-border)]/15 pt-4">
+                  <p className="text-xs text-[var(--color-muted)] mb-3 font-bold">Usage breakdown</p>
+                  <div className="flex flex-col gap-3">
+                    {usageBreakdown.sources.map((source: UsageBreakdownSource) => (
+                      <div key={source.source} className="rounded-[14px] border border-[var(--color-border)]/15 bg-[var(--color-surface-2)]/50 p-3">
+                        <div className="mb-2 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-[var(--color-text)]">{getUsageSourceLabel(source.source)}</p>
+                            <p className="text-[10px] uppercase tracking-wider text-[var(--color-muted)]">
+                              {fmt(source.total_sessions)} sessions • {fmt(source.total_events)} events
+                            </p>
+                          </div>
+                          <span className="text-xs font-bold tabular-nums text-[var(--color-text)]">
+                            {fmt(source.total_tokens)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          {source.providers.map((provider: UsageBreakdownProvider) => (
+                            <div key={`${source.source}:${provider.provider}`} className="flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-muted)]">
+                                  {getUsageProviderLabel(provider.provider)}
+                                </span>
+                                <span className="text-[10px] font-bold tabular-nums text-[var(--color-muted)]">
+                                  {fmt(provider.total_tokens)}
+                                </span>
+                              </div>
+                              {provider.models.slice(0, 3).map((model: UsageBreakdownModel, index: number) => {
+                                const pct = source.total_tokens > 0
+                                  ? Math.max(2, Math.round((model.total_tokens / source.total_tokens) * 100))
+                                  : 0
+                                return (
+                                  <div key={`${source.source}:${provider.provider}:${model.model}`} className="flex items-center gap-2 text-sm">
+                                    <span className="w-24 truncate text-[var(--color-muted)] font-bold" title={model.model}>
+                                      {getUsageModelLabel(model.model)}
+                                    </span>
+                                    <div className="game-progress-track flex-1 h-4">
+                                      <div
+                                        className="game-progress-fill model-bar bg-[var(--color-accent)]"
+                                        style={{ width: `${pct}%`, '--bar-index': index } as CSSProperties}
+                                      />
+                                    </div>
+                                    <span className="w-16 text-right text-[var(--color-muted)] tabular-nums font-bold">{pct}%</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : models.length > 0 && (
                 <div className="w-full border-t border-[var(--color-border)]/15 pt-4">
                   <p className="text-xs text-[var(--color-muted)] mb-3 font-bold">Models used</p>
                   <div className="flex flex-col gap-2">
@@ -332,7 +411,7 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
                           <div className="game-progress-track flex-1 h-4">
                             <div
                               className="game-progress-fill model-bar bg-[var(--color-accent)]"
-                              style={{ width: `${pct}%`, '--bar-index': index } as React.CSSProperties}
+                              style={{ width: `${pct}%`, '--bar-index': index } as CSSProperties}
                             />
                           </div>
                           <span className="w-16 text-right text-[var(--color-muted)] tabular-nums font-bold">{pct}%</span>
