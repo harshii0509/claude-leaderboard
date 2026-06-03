@@ -10,6 +10,7 @@ import {
   getTopModelLabel,
 } from '../lib/profile-share-utils.ts'
 import { parseShareResponse } from '../lib/profile-share-client.ts'
+import { fetchImageAsDataUrl } from '../lib/profile-share-image.ts'
 
 test('formatCompactNumber formats thousands and millions', () => {
   assert.equal(formatCompactNumber(950), '950')
@@ -104,10 +105,75 @@ test('parseShareResponse handles non-JSON error responses without a JSON parse c
   await assert.rejects(() => parseShareResponse(response), /Internal Server Error/)
 })
 
+test('fetchImageAsDataUrl returns null for non-image responses', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () =>
+    new Response('<html>not an image</html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    })) as typeof fetch
+
+  try {
+    const result = await fetchImageAsDataUrl('https://example.com/avatar')
+    assert.equal(result, null)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('fetchImageAsDataUrl returns null for unsupported image formats', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async () =>
+    new Response('RIFF....WEBP', {
+      status: 200,
+      headers: { 'content-type': 'image/webp' },
+    })) as typeof fetch
+
+  try {
+    const result = await fetchImageAsDataUrl('https://example.com/avatar.webp')
+    assert.equal(result, null)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('fetchImageAsDataUrl preserves supported image responses as data urls', async () => {
+  const originalFetch = globalThis.fetch
+  const pngBytes = Uint8Array.from([137, 80, 78, 71])
+  globalThis.fetch = (async () =>
+    new Response(pngBytes, {
+      status: 200,
+      headers: { 'content-type': 'image/png; charset=binary' },
+    })) as typeof fetch
+
+  try {
+    const result = await fetchImageAsDataUrl('https://example.com/avatar.png')
+    assert.equal(result, 'data:image/png;base64,iVBORw==')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
 test('ProfileShareCard source stays OG-safe by avoiding inline-flex styles', () => {
   const source = readFileSync(
     fileURLToPath(new URL('../components/ProfileShareCard.tsx', import.meta.url)),
     'utf8',
   )
   assert.doesNotMatch(source, /inline-flex/)
+})
+
+test('ProfileShareCard source stays OG-safe by avoiding grid layouts', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('../components/ProfileShareCard.tsx', import.meta.url)),
+    'utf8',
+  )
+  assert.doesNotMatch(source, /display:\s*'grid'|gridTemplateColumns/)
+})
+
+test('ProfileShareCard source stays OG-safe by avoiding line-break child stacks in divs', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('../components/ProfileShareCard.tsx', import.meta.url)),
+    'utf8',
+  )
+  assert.doesNotMatch(source, /<br\s*\/>/)
 })

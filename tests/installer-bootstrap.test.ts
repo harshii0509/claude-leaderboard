@@ -43,10 +43,10 @@ async function runCommand(command: string, args: string[], options: {
 }
 
 async function withInstallServer(
-  handler: (baseUrl: string, state: { exchangeCount: number; syncScript: string }) => Promise<void> | void,
+  handler: (baseUrl: string, state: { exchangeCount: number; syncScript: string; syncPayloads: unknown[] }) => Promise<void> | void,
 ) {
   const syncScript = await readFile(path.join(process.cwd(), 'public/sync.py'), 'utf8')
-  const state = { exchangeCount: 0, syncScript }
+  const state = { exchangeCount: 0, syncScript, syncPayloads: [] as unknown[] }
 
   const server = createServer(async (req, res) => {
     if (!req.url) {
@@ -73,6 +73,12 @@ async function withInstallServer(
     }
 
     if (req.method === 'POST' && req.url === '/api/sync') {
+      let body = ''
+      req.on('data', (chunk) => {
+        body += chunk.toString()
+      })
+      await new Promise<void>((resolve) => req.on('end', () => resolve()))
+      state.syncPayloads.push(JSON.parse(body || '{}'))
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({ ok: true, sync_generation: 2 }))
       return
@@ -204,6 +210,131 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
       })
       assert.equal(result.status, 0, result.stderr)
       assert.match(result.stdout, /upgrade complete/)
+    } finally {
+      await rm(homeDir, { recursive: true, force: true })
+    }
+  })
+})
+
+test('install performs an immediate first sync for existing Claude and Codex history', async () => {
+  await withInstallServer(async (baseUrl, state) => {
+    const homeDir = await createTempHome()
+    const scriptFile = path.join(homeDir, 'install.sh')
+    const claudeProjectDir = path.join(homeDir, '.claude', 'projects', 'demo')
+    const codexDir = path.join(homeDir, '.codex')
+    const codexDbPath = path.join(codexDir, 'logs_2.sqlite')
+
+    try {
+      await mkdir(claudeProjectDir, { recursive: true })
+      await mkdir(codexDir, { recursive: true })
+      await writeFile(
+        path.join(claudeProjectDir, 'session.jsonl'),
+        `${JSON.stringify({
+          type: 'assistant',
+          sessionId: 'claude-session-1',
+          timestamp: '2026-06-03T08:00:00.000Z',
+          message: {
+            id: 'claude-msg-1',
+            model: 'claude-opus-4',
+            stop_reason: 'end_turn',
+            usage: {
+              input_tokens: 120,
+              output_tokens: 80,
+              cache_creation_input_tokens: 5,
+              cache_read_input_tokens: 10,
+            },
+          },
+        })}\n`,
+        'utf8',
+      )
+
+      const createDb = await runCommand('python3', ['-c', `
+import sqlite3, sys
+path = sys.argv[1]
+conn = sqlite3.connect(path)
+conn.execute("""
+CREATE TABLE logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  ts_nanos INTEGER NOT NULL,
+  level TEXT NOT NULL,
+  target TEXT NOT NULL,
+  feedback_log_body TEXT,
+  module_path TEXT,
+  file TEXT,
+  line INTEGER,
+  thread_id TEXT,
+  process_uuid TEXT,
+  estimated_bytes INTEGER NOT NULL DEFAULT 0
+)
+""")
+body = 'session_loop{thread_id=019e89df-8fb9-7a62-94fa-356e8a412941}:submission_dispatch{otel.name="op.dispatch.user_input" submission.id="019e89df-943c-7532-8086-45116761efa4" codex.op="user_input"}:turn{otel.name="session_task.turn" thread.id=019e89df-8fb9-7a62-94fa-356e8a412941 turn.id=019e89df-943c-7532-8086-45116761efa4 model=gpt-5.4-mini codex.turn.reasoning_effort=low codex.turn.token_usage.input_tokens=17455 codex.turn.token_usage.cached_input_tokens=1536 codex.turn.token_usage.non_cached_input_tokens=15919 codex.turn.token_usage.output_tokens=61 codex.turn.token_usage.reasoning_output_tokens=40 codex.turn.token_usage.total_tokens=17516}:  name="Metrics.InstrumentCreated" instrument_name="codex.turn.memory" cardinality_limit=2000'
+conn.execute("insert into logs (ts, ts_nanos, level, target, feedback_log_body, estimated_bytes) values (?, ?, 'INFO', 'opentelemetry_sdk', ?, 0)", (1748937600, 0, body))
+conn.commit()
+conn.close()
+      `, codexDbPath], {
+        cwd: process.cwd(),
+        env: { ...process.env, HOME: homeDir },
+      })
+      assert.equal(createDb.status, 0, createDb.stderr)
+
+      await writeFile(scriptFile, buildInstallBootstrapScript(baseUrl, 'install-token-4'), 'utf8')
+      const result = await runCommand('bash', [scriptFile], {
+        cwd: process.cwd(),
+        env: { ...process.env, HOME: homeDir },
+      })
+
+      assert.equal(result.status, 0, result.stderr)
+      assert.match(result.stdout, /Initial sync complete/)
+      assert.equal(state.syncPayloads.length, 1)
+
+      const payload = state.syncPayloads[0] as {
+        events?: Array<{
+          source: string
+          model: string
+          input_tokens: number
+          output_tokens: number
+          cache_read_input_tokens: number
+        }>
+      }
+      assert.ok(payload.events)
+      assert.equal(payload.events?.length, 2)
+
+      const claudeEvent = payload.events?.find((event) => event.source === 'claude')
+      assert.deepEqual(
+        claudeEvent && {
+          source: claudeEvent.source,
+          model: claudeEvent.model,
+          input_tokens: claudeEvent.input_tokens,
+          output_tokens: claudeEvent.output_tokens,
+          cache_read_input_tokens: claudeEvent.cache_read_input_tokens,
+        },
+        {
+          source: 'claude',
+          model: 'claude-opus-4',
+          input_tokens: 120,
+          output_tokens: 80,
+          cache_read_input_tokens: 10,
+        },
+      )
+
+      const codexEvent = payload.events?.find((event) => event.source === 'codex')
+      assert.deepEqual(
+        codexEvent && {
+          source: codexEvent.source,
+          model: codexEvent.model,
+          input_tokens: codexEvent.input_tokens,
+          output_tokens: codexEvent.output_tokens,
+          cache_read_input_tokens: codexEvent.cache_read_input_tokens,
+        },
+        {
+          source: 'codex',
+          model: 'gpt-5.4-mini',
+          input_tokens: 17455,
+          output_tokens: 101,
+          cache_read_input_tokens: 1536,
+        },
+      )
     } finally {
       await rm(homeDir, { recursive: true, force: true })
     }

@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react'
 import { formatCompactNumber } from '@/lib/profile-share-utils'
 import type { ProfileShareCardData } from '@/lib/profile-share-types'
 
@@ -9,39 +8,49 @@ interface ProfileShareCardProps {
 }
 
 const palette = {
-  sky: '#5ab5f9',
-  surface: '#f1f5fa',
-  surfaceInset: '#dbe7f2',
-  border: '#222635',
-  text: '#212121',
-  muted: '#5a6480',
-  accent: '#a6d345',
-  accentBorder: '#204c17',
-  purple: '#7c6af7',
-  gold: '#f5c842',
+  skyTop: '#6fc4ff',
+  skyBottom: '#a6ddff',
+  shell: '#f7fbff',
+  panel: '#e8f1f8',
+  border: '#1f2937',
+  text: '#16202b',
+  muted: '#5a6b7d',
+  accent: '#b8e04a',
+  accentBorder: '#35511b',
+  purple: '#7568f4',
+  gold: '#f3c94a',
+  orange: '#ff9548',
 }
 
-function statBoxStyle(scale: number): CSSProperties {
-  return {
-    flex: 1,
-    minWidth: 0,
-    border: `3px solid ${palette.border}`,
-    borderRadius: 24 * scale,
-    background: palette.surface,
-    padding: `${18 * scale}px ${18 * scale}px ${16 * scale}px`,
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: `0 ${6 * scale}px 0 -2px ${palette.border}`,
+function statColor(label: string) {
+  switch (label) {
+    case 'Tokens':
+      return palette.accent
+    case 'Messages':
+      return palette.purple
+    case 'Sessions':
+      return palette.gold
+    default:
+      return palette.orange
   }
 }
 
-export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: ProfileShareCardProps) {
-  const avatarSize = 112 * scale
+function initials(name: string) {
+  return name.trim().charAt(0).toUpperCase() || '?'
+}
+
+export default function ProfileShareCard({
+  data,
+  avatarSrc,
+  scale = 1,
+}: ProfileShareCardProps) {
+  const outerPad = 32 * scale
+  const avatarSize = 108 * scale
   const stats = [
-    { label: 'Tokens', value: formatCompactNumber(data.totalTokens), color: palette.accent },
-    { label: 'Messages', value: formatCompactNumber(data.totalMessages), color: palette.purple },
-    { label: 'Sessions', value: formatCompactNumber(data.totalSessions), color: palette.gold },
-    { label: 'Streak', value: `${data.currentStreak}d`, color: '#ff8b3d' },
+    { label: 'Tokens', value: formatCompactNumber(data.totalTokens) },
+    { label: 'Messages', value: formatCompactNumber(data.totalMessages) },
+    { label: 'Sessions', value: formatCompactNumber(data.totalSessions) },
+    { label: 'Streak', value: `${data.currentStreak}d` },
   ]
 
   return (
@@ -50,60 +59,52 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
         width: 1200 * scale,
         height: 630 * scale,
         display: 'flex',
-        position: 'relative',
-        overflow: 'hidden',
         flexDirection: 'column',
-        background: `linear-gradient(180deg, ${palette.sky} 0%, #7fc8ff 100%)`,
+        background: `linear-gradient(180deg, ${palette.skyTop} 0%, ${palette.skyBottom} 100%)`,
         color: palette.text,
-        fontFamily: 'Nunito, Arial, sans-serif',
+        fontFamily: 'Arial, sans-serif',
+        padding: outerPad,
       }}
     >
       <div
         style={{
-          position: 'absolute',
-          inset: 0,
-          opacity: 0.2,
-          backgroundImage:
-            'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.7) 0, rgba(255,255,255,0.7) 6px, transparent 7px), radial-gradient(circle at 80% 30%, rgba(255,255,255,0.5) 0, rgba(255,255,255,0.5) 5px, transparent 6px), radial-gradient(circle at 60% 80%, rgba(255,255,255,0.45) 0, rgba(255,255,255,0.45) 8px, transparent 9px)',
-        }}
-      />
-
-      <div
-        style={{
           display: 'flex',
           flex: 1,
-          margin: 34 * scale,
-          border: `4px solid ${palette.border}`,
-          borderRadius: 42 * scale,
-          background: 'rgba(241,245,250,0.95)',
-          boxShadow: `0 ${10 * scale}px 0 -4px ${palette.border}`,
+          borderRadius: 36 * scale,
+          border: `${4 * scale}px solid ${palette.border}`,
+          background: palette.shell,
           overflow: 'hidden',
         }}
       >
         <div
           style={{
-            width: 368 * scale,
-            padding: `${34 * scale}px ${28 * scale}px`,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            background: 'linear-gradient(180deg, rgba(166,211,69,0.3) 0%, rgba(255,255,255,0.85) 100%)',
-            borderRight: `4px solid ${palette.border}`,
+            width: 360 * scale,
+            padding: 28 * scale,
+            background: `linear-gradient(180deg, rgba(184,224,74,0.32) 0%, #ffffff 100%)`,
+            borderRight: `${4 * scale}px solid ${palette.border}`,
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 * scale }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
             <div
               style={{
                 display: 'flex',
                 alignSelf: 'flex-start',
                 padding: `${10 * scale}px ${16 * scale}px`,
                 borderRadius: 999,
-                border: `3px solid ${palette.accentBorder}`,
+                border: `${3 * scale}px solid ${palette.accentBorder}`,
                 background: palette.accent,
-                color: '#162410',
+                color: '#18230f',
                 fontWeight: 800,
                 fontSize: 22 * scale,
-                boxShadow: `0 ${5 * scale}px 0 -2px ${palette.accentBorder}`,
+                marginBottom: 20 * scale,
               }}
             >
               Shareable profile
@@ -111,18 +112,19 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
 
             <div
               style={{
+                display: 'flex',
                 width: avatarSize,
                 height: avatarSize,
-                borderRadius: '50%',
-                border: `5px solid ${palette.border}`,
+                borderRadius: 999,
+                border: `${5 * scale}px solid ${palette.border}`,
                 overflow: 'hidden',
-                background: `linear-gradient(135deg, ${palette.purple}, #af6ae0)`,
-                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fff',
-                fontSize: 48 * scale,
+                background: `linear-gradient(135deg, ${palette.purple} 0%, #b36ef0 100%)`,
+                color: '#ffffff',
+                fontSize: 44 * scale,
                 fontWeight: 900,
+                marginBottom: 20 * scale,
               }}
             >
               {avatarSrc ? (
@@ -131,28 +133,38 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
                   alt={data.displayName}
                   width={avatarSize}
                   height={avatarSize}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  style={{ width: '100%', height: '100%' }}
                 />
               ) : (
-                data.displayName[0]?.toUpperCase() ?? '?'
+                initials(data.displayName)
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 * scale }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
               <div
                 style={{
-                  fontSize: 48 * scale,
-                  lineHeight: 1.05,
+                  display: 'flex',
+                  fontSize: 42 * scale,
                   fontWeight: 900,
-                  fontFamily: 'Fredoka, Nunito, Arial, sans-serif',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  lineHeight: 1.05,
+                  marginBottom: 8 * scale,
                 }}
               >
                 {data.displayName}
               </div>
-              <div style={{ fontSize: 22 * scale, color: palette.muted, fontWeight: 700 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: 22 * scale,
+                  color: palette.muted,
+                  fontWeight: 700,
+                }}
+              >
                 {data.syncLabel}
               </div>
             </div>
@@ -160,31 +172,44 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
 
           <div
             style={{
-              border: `3px solid ${palette.border}`,
-              borderRadius: 28 * scale,
-              background: palette.surface,
-              padding: `${18 * scale}px ${20 * scale}px`,
-              boxShadow: `0 ${5 * scale}px 0 -2px ${palette.border}`,
               display: 'flex',
               flexDirection: 'column',
-              gap: 10 * scale,
+              border: `${3 * scale}px solid ${palette.border}`,
+              borderRadius: 24 * scale,
+              background: palette.panel,
+              padding: 18 * scale,
             }}
           >
             <div
               style={{
-                fontSize: 18 * scale,
-                color: palette.muted,
-                fontWeight: 800,
+                display: 'flex',
+                fontSize: 16 * scale,
                 textTransform: 'uppercase',
                 letterSpacing: 1,
+                color: palette.muted,
+                fontWeight: 800,
+                marginBottom: 10 * scale,
               }}
             >
               Current vibe
             </div>
-            <div style={{ fontSize: 28 * scale, fontWeight: 900 }}>
+            <div
+              style={{
+                display: 'flex',
+                fontSize: 28 * scale,
+                fontWeight: 900,
+                marginBottom: 8 * scale,
+              }}
+            >
               {data.topModel ? `Mostly using ${data.topModel}` : 'Just getting warmed up'}
             </div>
-            <div style={{ fontSize: 18 * scale, color: palette.muted }}>
+            <div
+              style={{
+                display: 'flex',
+                fontSize: 18 * scale,
+                color: palette.muted,
+              }}
+            >
               Claude Leaderboard
             </div>
           </div>
@@ -192,49 +217,78 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
 
         <div
           style={{
-            flex: 1,
-            padding: `${34 * scale}px ${32 * scale}px`,
             display: 'flex',
+            flex: 1,
             flexDirection: 'column',
             justifyContent: 'space-between',
+            padding: 30 * scale,
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 * scale }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              marginBottom: 18 * scale,
+            }}
+          >
             <div
               style={{
-                fontSize: 20 * scale,
-                color: palette.muted,
-                fontWeight: 800,
+                display: 'flex',
+                fontSize: 18 * scale,
                 textTransform: 'uppercase',
                 letterSpacing: 1.2,
+                color: palette.muted,
+                fontWeight: 800,
+                marginBottom: 12 * scale,
               }}
             >
               AI activity snapshot
             </div>
             <div
               style={{
-                fontSize: 54 * scale,
-                lineHeight: 1.02,
+                display: 'flex',
+                flexDirection: 'column',
+                fontSize: 50 * scale,
+                lineHeight: 1.04,
                 fontWeight: 900,
-                fontFamily: 'Fredoka, Nunito, Arial, sans-serif',
               }}
             >
-              Shipping with
-              <br />
-              serious momentum.
+              <div style={{ display: 'flex' }}>Shipping with</div>
+              <div style={{ display: 'flex' }}>serious momentum.</div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 * scale }}>
-            {stats.map((stat) => (
-              <div key={stat.label} style={statBoxStyle(scale)}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              marginBottom: 18 * scale,
+            }}
+          >
+            {stats.map((stat, index) => (
+              <div
+                key={stat.label}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  width: '48.5%',
+                  border: `${3 * scale}px solid ${palette.border}`,
+                  borderRadius: 22 * scale,
+                  background: palette.shell,
+                  padding: 18 * scale,
+                  marginBottom: index < 2 ? 14 * scale : 0,
+                }}
+              >
                 <div
                   style={{
-                    fontSize: 18 * scale,
-                    color: palette.muted,
-                    fontWeight: 800,
+                    display: 'flex',
+                    fontSize: 16 * scale,
                     textTransform: 'uppercase',
                     letterSpacing: 1,
+                    color: palette.muted,
+                    fontWeight: 800,
+                    marginBottom: 10 * scale,
                   }}
                 >
                   {stat.label}
@@ -243,25 +297,25 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12 * scale,
-                    marginTop: 8 * scale,
                   }}
                 >
                   <div
                     style={{
+                      display: 'flex',
                       width: 18 * scale,
                       height: 18 * scale,
-                      borderRadius: '50%',
-                      background: stat.color,
-                      border: `2px solid ${palette.border}`,
+                      borderRadius: 999,
+                      background: statColor(stat.label),
+                      border: `${2 * scale}px solid ${palette.border}`,
+                      marginRight: 12 * scale,
                     }}
                   />
                   <div
                     style={{
-                      fontSize: 42 * scale,
+                      display: 'flex',
+                      fontSize: 38 * scale,
                       lineHeight: 1,
                       fontWeight: 900,
-                      fontFamily: 'Fredoka, Nunito, Arial, sans-serif',
                     }}
                   >
                     {stat.value}
@@ -273,40 +327,54 @@ export default function ProfileShareCard({ data, avatarSrc, scale = 1 }: Profile
 
           <div
             style={{
-              borderRadius: 28 * scale,
-              border: `3px solid ${palette.border}`,
-              background: palette.surfaceInset,
-              padding: `${18 * scale}px ${22 * scale}px`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              boxShadow: `0 ${5 * scale}px 0 -2px ${palette.border}`,
+              border: `${3 * scale}px solid ${palette.border}`,
+              borderRadius: 24 * scale,
+              background: palette.panel,
+              padding: `${18 * scale}px ${20 * scale}px`,
             }}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 * scale }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
               <div
                 style={{
-                  fontSize: 18 * scale,
-                  color: palette.muted,
-                  fontWeight: 800,
+                  display: 'flex',
+                  fontSize: 16 * scale,
                   textTransform: 'uppercase',
                   letterSpacing: 1,
+                  color: palette.muted,
+                  fontWeight: 800,
+                  marginBottom: 8 * scale,
                 }}
               >
                 Powered by consistent sessions
               </div>
-              <div style={{ fontSize: 26 * scale, fontWeight: 900 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  fontSize: 24 * scale,
+                  fontWeight: 900,
+                }}
+              >
                 {data.currentStreak > 0
                   ? `${data.currentStreak} day${data.currentStreak === 1 ? '' : 's'} in a row`
                   : 'Start a streak with your next sync'}
               </div>
             </div>
+
             <div
               style={{
+                display: 'flex',
                 padding: `${12 * scale}px ${18 * scale}px`,
                 borderRadius: 999,
-                background: '#fff',
-                border: `3px solid ${palette.border}`,
+                background: '#ffffff',
+                border: `${3 * scale}px solid ${palette.border}`,
                 fontSize: 18 * scale,
                 fontWeight: 800,
               }}

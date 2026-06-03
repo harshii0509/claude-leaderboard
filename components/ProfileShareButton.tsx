@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
-import ProfileShareCard from '@/components/ProfileShareCard'
 import { parseShareResponse, type SharePayload } from '@/lib/profile-share-client'
 
 function dataUrlToFile(dataUrl: string, filename: string) {
@@ -174,10 +173,12 @@ export default function ProfileShareButton() {
                 <div className="game-card bg-[var(--color-surface-2)] p-3">
                   <div className="overflow-hidden rounded-[20px] border-2 border-[var(--color-border)] bg-white">
                     {payload ? (
-                      <div className="w-full overflow-auto bg-[var(--color-surface-2)]">
-                        <div className="h-[630px] w-[1200px] origin-top-left scale-[0.26] sm:scale-[0.37] md:scale-[0.48] lg:scale-[0.5] xl:scale-[0.58]">
-                          <ProfileShareCard data={payload.card} avatarSrc={payload.card.avatarUrl} />
-                        </div>
+                      <div className="w-full overflow-auto bg-[var(--color-surface-2)] p-3">
+                        <img
+                          src={payload.image}
+                          alt={`${payload.card.displayName}'s share card preview`}
+                          className="h-auto w-full rounded-[18px] border-2 border-[var(--color-border)] bg-white"
+                        />
                       </div>
                     ) : (
                       <div className="flex min-h-[280px] items-center justify-center text-sm font-bold text-[var(--color-muted)]">

@@ -40,6 +40,7 @@ SETTINGS_BACKUP=""
 INSTALL_MODE="fresh install"
 SETTINGS_STATE="missing"
 HOOK_STATUS="pending"
+INITIAL_SYNC_STATUS="pending"
 IS_TTY=0
 if [ -t 1 ]; then
   IS_TTY=1
@@ -316,6 +317,10 @@ verify_install() {
   python3 "\${SYNC_SCRIPT}" --health-check
 }
 
+run_initial_sync() {
+  python3 "\${SYNC_SCRIPT}"
+}
+
 print_summary() {
   local version
   version="$(python3 "\${SYNC_SCRIPT}" --version)"
@@ -329,6 +334,13 @@ print_summary() {
   if [ -n "\${SETTINGS_BACKUP}" ]; then
     note "Backup: \${SETTINGS_BACKUP}"
   fi
+  if [ "\${INITIAL_SYNC_STATUS}" = "success" ]; then
+    ok "Initial sync complete"
+    note "Any existing local Claude or Codex history has been uploaded."
+  else
+    warn "Initial sync did not complete"
+    note "Your hook is installed. Run python3 ~/.claude/sync.py after fixing connectivity to upload local history."
+  fi
   printf "\\n%sNext:%s run %spython3 ~/.claude/sync.py%s whenever you want an immediate manual sync.\\n" "\${COLOR_BLUE}" "\${COLOR_RESET}" "\${COLOR_GREEN}" "\${COLOR_RESET}"
 }
 
@@ -341,6 +353,11 @@ run_step "Exchanging install token" exchange_install_token || fail "Could not ex
 run_step "Preparing Claude settings hook" prepare_settings || fail "Could not prepare Claude settings"
 run_step "Writing files atomically" commit_install || fail "Could not write installer files"
 run_step "Running local health check" verify_install || fail "Install finished writing files, but local verification failed"
+if run_step "Running initial sync" run_initial_sync; then
+  INITIAL_SYNC_STATUS="success"
+else
+  INITIAL_SYNC_STATUS="failed"
+fi
 print_summary
 `
 }

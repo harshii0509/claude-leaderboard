@@ -83,7 +83,7 @@ export default async function SetupPage() {
             <li>Runs a local health check before it exits</li>
           </ol>
           <p className="text-sm text-[var(--color-muted)]">
-            After installation, Claude will run <code className="text-[var(--color-text)] font-mono">python3 ~/.claude/sync.py</code> automatically at the end of every session.
+            The installer attempts an immediate first sync as soon as setup finishes, and Claude will keep running <code className="text-[var(--color-text)] font-mono">python3 ~/.claude/sync.py</code> automatically at the end of every session after that.
             The same script also reads Codex usage from <code className="text-[var(--color-text)] font-mono">~/.codex/logs_2.sqlite</code> when present.
           </p>
           <p className="text-sm text-[var(--color-muted)]">

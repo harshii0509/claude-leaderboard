@@ -159,7 +159,7 @@ At least one auth provider must be configured. Google remains the default path u
 1. Users sign in with Google and visit the **Setup** page
 2. They run a one-line curl command or an inspect-before-run variant from the Setup page
 3. The installer preflights the local shell, downloads `sync.py`, then exchanges a short-lived install token for that user's long-lived sync credential and stores it locally in `~/.claude/sync_config.json`
-4. After every Claude Code session, the hook runs `sync.py`, which incrementally parses new finalized usage events from `~/.claude/projects/` and Codex turn telemetry from `~/.codex/logs_2.sqlite`, then POSTs raw events to your deployment
+4. The installer attempts an immediate first sync, then after every Claude Code session the hook runs `sync.py`, which incrementally parses new finalized usage events from `~/.claude/projects/` and Codex turn telemetry from `~/.codex/logs_2.sqlite`, then POSTs raw events to your deployment
 5. The server validates those events, stores them idempotently, and computes the official leaderboard totals, streaks, sessions, and model breakdowns
 6. The leaderboard updates automatically
 

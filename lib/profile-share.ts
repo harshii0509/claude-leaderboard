@@ -1,6 +1,7 @@
 import { supabaseAdmin } from './db'
 import { computeStreaks } from './leaderboard-math'
 import type { ProfileShareCardData } from './profile-share-types'
+import { fetchImageAsDataUrl as fetchProfileImageAsDataUrl } from './profile-share-image'
 import {
   buildShareCaption,
   buildShareFilename,
@@ -74,20 +75,7 @@ export async function getProfileShareCardData(
 }
 
 export async function fetchImageAsDataUrl(src: string | null) {
-  if (!src) return null
-
-  try {
-    const response = await fetch(src)
-    if (!response.ok) return null
-
-    const contentType = response.headers.get('content-type') ?? 'image/png'
-    const arrayBuffer = await response.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-
-    return `data:${contentType};base64,${base64}`
-  } catch {
-    return null
-  }
+  return fetchProfileImageAsDataUrl(src)
 }
 
 export {
