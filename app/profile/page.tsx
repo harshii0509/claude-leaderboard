@@ -23,9 +23,10 @@ import {
   type UsageBreakdownSource,
 } from '@/lib/usage-breakdown-shared'
 import { getUserUsageBreakdown } from '@/lib/usage-breakdown'
+import { isMissingUsageBreakdownError } from '@/lib/usage-breakdown-errors'
 
 async function getUserStats(userId: string) {
-  const [{ data: stats }, { data: activity }, usageBreakdown] = await Promise.all([
+  const [{ data: stats }, { data: activity }, usageBreakdownResult] = await Promise.all([
     supabaseAdmin
       .from('user_stats')
       .select('*')
@@ -36,7 +37,16 @@ async function getUserStats(userId: string) {
       .select('date, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, messages, sessions')
       .eq('user_id', userId)
       .order('date', { ascending: true }),
-    getUserUsageBreakdown(userId),
+    getUserUsageBreakdown(userId).then(
+      (usageBreakdown) => ({ usageBreakdown }),
+      (error) => {
+        if (isMissingUsageBreakdownError(error)) {
+          return { usageBreakdown: null }
+        }
+
+        throw error
+      },
+    ),
   ])
 
   const allActivity = activity ?? []
@@ -46,7 +56,7 @@ async function getUserStats(userId: string) {
     stats: stats
       ? {
           ...stats,
-          usage_breakdown: usageBreakdown,
+          usage_breakdown: usageBreakdownResult.usageBreakdown,
           current_streak: streaks.current,
           longest_streak: Math.max(stats.longest_streak ?? 0, streaks.longest),
         }
