@@ -9,7 +9,12 @@ import {
   getSyncLabel,
   getTopModelLabel,
 } from '../lib/profile-share-utils.ts'
-import { parseShareResponse } from '../lib/profile-share-client.ts'
+import {
+  buildXShareIntentUrl,
+  getLinkedInComposerUrl,
+  parseShareResponse,
+} from '../lib/profile-share-client.ts'
+import { PROFILE_SHARE_CARD_SIZE } from '../lib/profile-share-constants.ts'
 import { fetchImageAsDataUrl } from '../lib/profile-share-image.ts'
 
 test('formatCompactNumber formats thousands and millions', () => {
@@ -105,6 +110,17 @@ test('parseShareResponse handles non-JSON error responses without a JSON parse c
   await assert.rejects(() => parseShareResponse(response), /Internal Server Error/)
 })
 
+test('buildXShareIntentUrl encodes share text for the X composer', () => {
+  const intentUrl = new URL(buildXShareIntentUrl('Track 24k AI tokens on Claude Leaderboard.'))
+  assert.equal(intentUrl.origin, 'https://twitter.com')
+  assert.equal(intentUrl.pathname, '/intent/tweet')
+  assert.equal(intentUrl.searchParams.get('text'), 'Track 24k AI tokens on Claude Leaderboard.')
+})
+
+test('getLinkedInComposerUrl points at the LinkedIn composer entry', () => {
+  assert.equal(getLinkedInComposerUrl(), 'https://www.linkedin.com/feed/?shareActive=true')
+})
+
 test('fetchImageAsDataUrl returns null for non-image responses', async () => {
   const originalFetch = globalThis.fetch
   globalThis.fetch = (async () =>
@@ -176,4 +192,8 @@ test('ProfileShareCard source stays OG-safe by avoiding line-break child stacks 
     'utf8',
   )
   assert.doesNotMatch(source, /<br\s*\/>/)
+})
+
+test('profile share cards stay square for social export quality', () => {
+  assert.equal(PROFILE_SHARE_CARD_SIZE, 1600)
 })

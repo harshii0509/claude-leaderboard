@@ -1,7 +1,10 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { ImageResponse } from 'next/og'
 import { createElement } from 'react'
 import ProfileShareCard from '../../../../components/ProfileShareCard'
 import { auth } from '@/lib/auth'
+import { PROFILE_SHARE_CARD_SIZE } from '@/lib/profile-share-constants'
 import { getInstanceMembership } from '@/lib/instance-membership'
 import {
   buildShareFilename,
@@ -11,13 +14,25 @@ import {
 
 export const runtime = 'nodejs'
 
+const shareFontsPromise = Promise.all([
+  readFile(join(process.cwd(), 'app/fonts/fredoka-latin.woff2')),
+  readFile(join(process.cwd(), 'app/fonts/nunito-latin.woff2')),
+]).then(([fredoka, nunito]) => [
+  { name: 'Fredoka', data: fredoka, weight: 600 as const, style: 'normal' as const },
+  { name: 'Nunito', data: nunito, weight: 800 as const, style: 'normal' as const },
+])
+
 async function renderShareImage(
   card: Awaited<ReturnType<typeof getProfileShareCardData>>,
   avatarSrc: string | null,
 ) {
   const imageResponse = new ImageResponse(
     createElement(ProfileShareCard, { data: card, avatarSrc }),
-    { width: 1200, height: 630 },
+    {
+      width: PROFILE_SHARE_CARD_SIZE,
+      height: PROFILE_SHARE_CARD_SIZE,
+      fonts: await shareFontsPromise,
+    },
   )
 
   const imageBuffer = Buffer.from(await imageResponse.arrayBuffer())
@@ -36,11 +51,10 @@ async function renderEmergencyShareImage(
           height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
-          background: 'linear-gradient(180deg, #6fc4ff 0%, #a6ddff 100%)',
-          color: '#16202b',
-          padding: '40px',
-          fontFamily: 'Arial, sans-serif',
+          background: '#5ab5f9',
+          color: '#212121',
+          padding: '64px',
+          fontFamily: 'Nunito',
         },
       },
       createElement(
@@ -49,127 +63,22 @@ async function renderEmergencyShareImage(
           style: {
             display: 'flex',
             flexDirection: 'column',
-            border: '4px solid #1f2937',
-            borderRadius: '32px',
-            background: '#f7fbff',
-            padding: '28px',
+            flex: 1,
+            border: '6px solid #222635',
+            borderRadius: '44px',
+            background: '#f1f5fa',
+            padding: '54px',
+            boxShadow: 'inset 10px -18px 0 0 #bfd1e8',
           },
         },
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              fontSize: '44px',
-              fontWeight: 900,
-              marginBottom: '12px',
-            },
-          },
-          card.displayName,
-        ),
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              fontSize: '22px',
-              color: '#5a6b7d',
-              marginBottom: '20px',
-            },
-          },
-          card.syncLabel,
-        ),
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              flexDirection: 'column',
-              fontSize: '54px',
-              fontWeight: 900,
-              lineHeight: 1.05,
-              marginBottom: '24px',
-            },
-          },
-          createElement('div', { style: { display: 'flex' } }, 'Shipping with'),
-          createElement('div', { style: { display: 'flex' } }, 'serious momentum.'),
-        ),
         createElement(
           'div',
           {
             style: {
               display: 'flex',
               justifyContent: 'space-between',
-            },
-          },
-          ...[
-            ['Tokens', String(card.totalTokens)],
-            ['Messages', String(card.totalMessages)],
-            ['Sessions', String(card.totalSessions)],
-            ['Streak', `${card.currentStreak}d`],
-          ].map(([label, value]) =>
-            createElement(
-              'div',
-              {
-                key: label,
-                style: {
-                  display: 'flex',
-                  flexDirection: 'column',
-                  width: '23%',
-                  border: '3px solid #1f2937',
-                  borderRadius: '22px',
-                  background: '#ffffff',
-                  padding: '16px',
-                },
-              },
-              createElement(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    fontSize: '15px',
-                    textTransform: 'uppercase',
-                    color: '#5a6b7d',
-                    fontWeight: 800,
-                    marginBottom: '8px',
-                  },
-                },
-                label,
-              ),
-              createElement(
-                'div',
-                {
-                  style: {
-                    display: 'flex',
-                    fontSize: '30px',
-                    fontWeight: 900,
-                  },
-                },
-                value,
-              ),
-            ),
-          ),
-        ),
-      ),
-      createElement(
-        'div',
-        {
-          style: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            border: '4px solid #1f2937',
-            borderRadius: '28px',
-            background: '#e8f1f8',
-            padding: '20px 28px',
-          },
-        },
-        createElement(
-          'div',
-          {
-            style: {
-              display: 'flex',
-              flexDirection: 'column',
+              alignItems: 'center',
+              marginBottom: '28px',
             },
           },
           createElement(
@@ -177,11 +86,16 @@ async function renderEmergencyShareImage(
             {
               style: {
                 display: 'flex',
-                fontSize: '16px',
-                textTransform: 'uppercase',
-                color: '#5a6b7d',
+                alignItems: 'center',
+                padding: '14px 24px',
+                borderRadius: '999px',
+                border: '4px solid #204c17',
+                background: '#a6d345',
+                fontSize: '24px',
                 fontWeight: 800,
-                marginBottom: '8px',
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                color: '#18230f',
               },
             },
             'Claude Leaderboard',
@@ -191,11 +105,17 @@ async function renderEmergencyShareImage(
             {
               style: {
                 display: 'flex',
-                fontSize: '24px',
-                fontWeight: 900,
+                alignItems: 'center',
+                padding: '14px 22px',
+                borderRadius: '999px',
+                border: '4px solid #222635',
+                background: '#deeaf5',
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#5a6480',
               },
             },
-            card.topModel ? `Top model: ${card.topModel}` : 'Keep the streak alive',
+            card.syncLabel,
           ),
         ),
         createElement(
@@ -203,15 +123,199 @@ async function renderEmergencyShareImage(
           {
             style: {
               display: 'flex',
-              fontSize: '20px',
-              fontWeight: 900,
+              fontFamily: 'Fredoka',
+              fontSize: '76px',
+              fontWeight: 600,
+              marginBottom: '18px',
             },
           },
-          'claude-leaderboard',
+          card.displayName,
+        ),
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              fontSize: '34px',
+              lineHeight: 1.1,
+              fontWeight: 800,
+              marginBottom: '28px',
+            },
+          },
+          'Built on consistent sessions and serious momentum.',
+        ),
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignSelf: 'flex-start',
+              padding: '14px 22px',
+              borderRadius: '26px',
+              border: '4px solid #222635',
+              background: '#ffffff',
+              fontSize: '24px',
+              fontWeight: 800,
+              color: '#5a6480',
+              marginBottom: '34px',
+            },
+          },
+          card.topModel ? `Mostly using ${card.topModel}` : 'Ready to climb the board',
+        ),
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              marginBottom: '34px',
+            },
+          },
+          ...[
+            [
+              ['Tokens', String(card.totalTokens)],
+              ['Messages', String(card.totalMessages)],
+            ],
+            [
+              ['Sessions', String(card.totalSessions)],
+              ['Streak', `${card.currentStreak}d`],
+            ],
+          ].map((row, rowIndex) =>
+            createElement(
+              'div',
+              {
+                key: `row-${rowIndex}`,
+                style: {
+                  display: 'flex',
+                  gap: '20px',
+                },
+              },
+              ...row.map(([label, value]) =>
+                createElement(
+                  'div',
+                  {
+                    key: label,
+                    style: {
+                      display: 'flex',
+                      flexDirection: 'column',
+                      flex: 1,
+                      minHeight: '220px',
+                      border: '4px solid #222635',
+                      borderRadius: '28px',
+                      background: '#ffffff',
+                      padding: '24px',
+                      boxShadow: 'inset 6px -12px 0 0 #deeaf5',
+                    },
+                  },
+                  createElement(
+                    'div',
+                    {
+                      style: {
+                        display: 'flex',
+                        fontSize: '22px',
+                        fontWeight: 800,
+                        letterSpacing: '1px',
+                        textTransform: 'uppercase',
+                        color: '#5a6480',
+                        marginBottom: '18px',
+                      },
+                    },
+                    label,
+                  ),
+                  createElement(
+                    'div',
+                    {
+                      style: {
+                        display: 'flex',
+                        fontFamily: 'Fredoka',
+                        fontSize: '72px',
+                        lineHeight: 0.95,
+                        fontWeight: 600,
+                      },
+                    },
+                    value,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        createElement(
+          'div',
+          {
+            style: {
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              border: '5px solid #222635',
+              borderRadius: '30px',
+              background: '#deeaf5',
+              padding: '24px 30px',
+            },
+          },
+          createElement(
+            'div',
+            {
+              style: {
+                display: 'flex',
+                flexDirection: 'column',
+              },
+            },
+            createElement(
+              'div',
+              {
+                style: {
+                  display: 'flex',
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  color: '#5a6480',
+                  marginBottom: '10px',
+                },
+              },
+              'Share your run',
+            ),
+            createElement(
+              'div',
+              {
+                style: {
+                  display: 'flex',
+                  fontFamily: 'Fredoka',
+                  fontSize: '42px',
+                  fontWeight: 600,
+                },
+              },
+              'From the board to your feed.',
+            ),
+          ),
+          createElement(
+            'div',
+            {
+              style: {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '18px 28px',
+                borderRadius: '999px',
+                border: '4px solid #222635',
+                background: '#ffffff',
+                fontFamily: 'Fredoka',
+                fontSize: '34px',
+                fontWeight: 600,
+              },
+            },
+            'claude-leaderboard',
+          ),
         ),
       ),
     ),
-    { width: 1200, height: 630 },
+    {
+      width: PROFILE_SHARE_CARD_SIZE,
+      height: PROFILE_SHARE_CARD_SIZE,
+      fonts: await shareFontsPromise,
+    },
   )
 
   const imageBuffer = Buffer.from(await fallback.arrayBuffer())

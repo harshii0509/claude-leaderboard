@@ -2,7 +2,12 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
-import { parseShareResponse, type SharePayload } from '@/lib/profile-share-client'
+import {
+  buildXShareIntentUrl,
+  getLinkedInComposerUrl,
+  parseShareResponse,
+  type SharePayload,
+} from '@/lib/profile-share-client'
 
 function dataUrlToFile(dataUrl: string, filename: string) {
   const [header, payload] = dataUrl.split(',', 2)
@@ -20,13 +25,39 @@ function dataUrlToFile(dataUrl: string, filename: string) {
   return new File([bytes], filename, { type: mimeType })
 }
 
+function triggerImageDownload(payload: SharePayload) {
+  const anchor = document.createElement('a')
+  anchor.href = payload.image
+  anchor.download = payload.filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+function openShareWindow(url: string) {
+  return window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+type HandoffTone = 'info' | 'success'
+
+interface HandoffState {
+  tone: HandoffTone
+  message: string
+}
+
 export default function ProfileShareButton() {
   const [open, setOpen] = useState(false)
   const [payload, setPayload] = useState<SharePayload | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [handoff, setHandoff] = useState<HandoffState | null>(null)
+  const [supportsNativeShare, setSupportsNativeShare] = useState(false)
   const [sharePending, startShareTransition] = useTransition()
   const [loadPending, startLoadTransition] = useTransition()
+
+  useEffect(() => {
+    setSupportsNativeShare(Boolean(navigator.share))
+  }, [])
 
   useEffect(() => {
     if (!open || payload) return
@@ -70,6 +101,11 @@ export default function ProfileShareButton() {
     return () => window.clearTimeout(timeout)
   }, [copied])
 
+  function resetTransientState() {
+    setError(null)
+    setHandoff(null)
+  }
+
   async function handleNativeShare() {
     if (!payload) return
 
@@ -87,6 +123,7 @@ export default function ProfileShareButton() {
             text: payload.caption,
             files: [imageFile],
           })
+          setHandoff({ tone: 'success', message: 'Shared with your device’s native sheet.' })
           return
         }
 
@@ -94,12 +131,13 @@ export default function ProfileShareButton() {
           title: `${payload.card.displayName}'s Claude Leaderboard snapshot`,
           text: payload.caption,
         })
+        setHandoff({ tone: 'success', message: 'Opened your device’s native share sheet.' })
       } catch (shareError) {
         if (shareError instanceof Error && shareError.name === 'AbortError') return
         setError(
           shareError instanceof Error
             ? shareError.message
-            : 'Sharing failed. Try the download fallback instead.',
+            : 'Sharing failed. Try the platform shortcuts or download the image instead.',
         )
       }
     })
@@ -108,10 +146,12 @@ export default function ProfileShareButton() {
   function handleDownload() {
     if (!payload) return
 
-    const anchor = document.createElement('a')
-    anchor.href = payload.image
-    anchor.download = payload.filename
-    anchor.click()
+    triggerImageDownload(payload)
+    setHandoff({
+      tone: 'success',
+      message: 'Image downloaded. You can upload it anywhere you want to share it.',
+    })
+    setError(null)
   }
 
   async function handleCopyCaption() {
@@ -121,9 +161,38 @@ export default function ProfileShareButton() {
       await navigator.clipboard.writeText(payload.caption)
       setCopied(true)
       setError(null)
+      setHandoff({ tone: 'success', message: 'Caption copied. Paste it into your post when needed.' })
     } catch {
       setError('Could not copy the caption. Please copy it manually below.')
     }
+  }
+
+  function handlePlatformShare(platform: 'x' | 'linkedin') {
+    if (!payload) return
+
+    triggerImageDownload(payload)
+    setError(null)
+
+    const platformUrl =
+      platform === 'x' ? buildXShareIntentUrl(payload.caption) : getLinkedInComposerUrl()
+    const openedWindow = openShareWindow(platformUrl)
+
+    if (!openedWindow) {
+      setError('Your browser blocked the share window. Please allow pop-ups and try again.')
+      setHandoff({
+        tone: 'info',
+        message: 'The image was downloaded, but the composer window did not open.',
+      })
+      return
+    }
+
+    setHandoff({
+      tone: 'success',
+      message:
+        platform === 'x'
+          ? 'Image downloaded. We opened X with your caption. Attach the card in the composer and post.'
+          : 'Image downloaded. We opened LinkedIn’s composer. Upload the card there and paste the caption if needed.',
+    })
   }
 
   return (
@@ -132,7 +201,7 @@ export default function ProfileShareButton() {
         type="button"
         className="game-btn text-sm px-4 py-2 text-black font-bold"
         onClick={() => {
-          setError(null)
+          resetTransientState()
           setOpen(true)
         }}
       >
@@ -147,7 +216,7 @@ export default function ProfileShareButton() {
               onClick={() => setOpen(false)}
             />
 
-            <div className="game-card relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden">
+            <div className="game-card relative z-10 flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden">
               <div className="shrink-0 border-b border-[var(--color-border)]/15 px-5 py-4 flex items-center justify-between">
                 <div>
                   <p
@@ -157,7 +226,7 @@ export default function ProfileShareButton() {
                     Share your profile
                   </p>
                   <p className="text-sm text-[var(--color-muted)]">
-                    Private export only. No public profile link.
+                    Pick a platform and we’ll prep the card for posting.
                   </p>
                 </div>
                 <button
@@ -169,7 +238,7 @@ export default function ProfileShareButton() {
                 </button>
               </div>
 
-              <div className="game-scrollbar overflow-y-auto px-5 py-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="game-scrollbar overflow-y-auto px-5 py-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="game-card bg-[var(--color-surface-2)] p-3">
                   <div className="overflow-hidden rounded-[20px] border-2 border-[var(--color-border)] bg-white">
                     {payload ? (
@@ -177,18 +246,45 @@ export default function ProfileShareButton() {
                         <img
                           src={payload.image}
                           alt={`${payload.card.displayName}'s share card preview`}
-                          className="h-auto w-full rounded-[18px] border-2 border-[var(--color-border)] bg-white"
+                          className="mx-auto h-auto w-full max-w-[720px] rounded-[18px] border-2 border-[var(--color-border)] bg-white"
                         />
                       </div>
                     ) : (
-                      <div className="flex min-h-[280px] items-center justify-center text-sm font-bold text-[var(--color-muted)]">
-                        {loadPending ? 'Generating your share card...' : 'Preparing preview...'}
+                      <div className="flex min-h-[420px] items-center justify-center text-sm font-bold text-[var(--color-muted)]">
+                        {loadPending ? 'Generating your square card...' : 'Preparing preview...'}
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-4">
+                  <div className="game-card p-4">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">
+                      Share to
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        type="button"
+                        className="game-btn px-4 py-3 text-sm font-bold text-black disabled:opacity-60"
+                        onClick={() => handlePlatformShare('x')}
+                        disabled={!payload}
+                      >
+                        Share to X
+                      </button>
+                      <button
+                        type="button"
+                        className="game-btn-ghost px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
+                        onClick={() => handlePlatformShare('linkedin')}
+                        disabled={!payload}
+                      >
+                        Share to LinkedIn
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-[var(--color-muted)]">
+                      We’ll download the image first, then open the composer for the platform you picked.
+                    </p>
+                  </div>
+
                   <div className="game-card p-4">
                     <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-muted)]">
                       Caption
@@ -203,6 +299,18 @@ export default function ProfileShareButton() {
                     )}
                   </div>
 
+                  {handoff && (
+                    <div
+                      className={`game-card p-4 text-sm ${
+                        handoff.tone === 'success'
+                          ? 'border border-[var(--color-accent-border)]/25 bg-[var(--color-accent)]/20 text-[var(--color-text)]'
+                          : 'border border-[var(--color-border)]/15 bg-[var(--color-surface-2)] text-[var(--color-text)]'
+                      }`}
+                    >
+                      {handoff.message}
+                    </div>
+                  )}
+
                   {error && (
                     <div className="game-card border border-[var(--color-red)]/30 bg-[var(--color-red)]/10 p-4 text-sm text-[var(--color-text)]">
                       {error}
@@ -212,15 +320,7 @@ export default function ProfileShareButton() {
                   <div className="flex flex-col gap-3">
                     <button
                       type="button"
-                      className="game-btn px-4 py-3 text-sm font-bold text-black disabled:opacity-60"
-                      onClick={handleNativeShare}
-                      disabled={!payload || sharePending}
-                    >
-                      {sharePending ? 'Sharing...' : 'Share'}
-                    </button>
-                    <button
-                      type="button"
-                      className="game-btn-ghost px-4 py-3 text-sm font-bold text-white"
+                      className="game-btn-icon px-4 py-3 text-sm font-bold text-[var(--color-text)]"
                       onClick={handleDownload}
                       disabled={!payload}
                     >
@@ -234,12 +334,17 @@ export default function ProfileShareButton() {
                     >
                       Copy caption
                     </button>
+                    {supportsNativeShare && (
+                      <button
+                        type="button"
+                        className="game-btn-icon px-4 py-3 text-sm font-bold text-[var(--color-text)] disabled:opacity-60"
+                        onClick={handleNativeShare}
+                        disabled={!payload || sharePending}
+                      >
+                        {sharePending ? 'Opening native share...' : 'Share natively'}
+                      </button>
+                    )}
                   </div>
-
-                  <p className="px-1 text-xs leading-relaxed text-[var(--color-muted)]">
-                    Native sharing works when your browser or device supports it. If not, download
-                    the image and paste the caption into X, LinkedIn, or anywhere else.
-                  </p>
                 </div>
               </div>
             </div>

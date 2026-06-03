@@ -7,6 +7,16 @@ export interface SharePayload {
   card: ProfileShareCardData
 }
 
+export function buildXShareIntentUrl(text: string) {
+  const url = new URL('https://twitter.com/intent/tweet')
+  url.searchParams.set('text', text)
+  return url.toString()
+}
+
+export function getLinkedInComposerUrl() {
+  return 'https://www.linkedin.com/feed/?shareActive=true'
+}
+
 function getErrorMessageFromJson(value: unknown) {
   if (!value || typeof value !== 'object') return null
 

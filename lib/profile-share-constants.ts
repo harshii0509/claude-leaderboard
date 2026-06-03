@@ -1,0 +1,1 @@
+export const PROFILE_SHARE_CARD_SIZE = 1600
