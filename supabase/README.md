@@ -10,6 +10,7 @@ The `migrations/` folder contains ordered SQL files that map to the current prod
 2. `202606010002_leaderboard_tables.sql`
 3. `202606010003_leaderboard_functions.sql`
 4. `202606010004_row_level_security.sql`
+5. `202606030001_user_widget_settings.sql`
 
 These files are designed for teams who want a more maintainable migration story than pasting one large SQL file into the Supabase editor.
 

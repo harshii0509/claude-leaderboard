@@ -1,5 +1,6 @@
 import { revalidateTag } from 'next/cache'
 import { supabaseAdmin } from './db'
+import { getPublishedWidgetPublicId } from './user-widget'
 import type { SyncPayload } from './sync-payload'
 export { validateSyncPayload } from './sync-payload'
 
@@ -58,6 +59,10 @@ export async function syncUserStats(userId: string, payload: SyncPayload) {
   revalidateTag('leaderboard', 'max')
   revalidateTag(`user-stats:${userId}`, 'max')
   revalidateTag(`activity:${userId}`, 'max')
+  const publicWidgetId = await getPublishedWidgetPublicId(userId).catch(() => null)
+  if (publicWidgetId) {
+    revalidateTag(`public-widget:${publicWidgetId}`, 'max')
+  }
 
   return {
     insertedEvents: result.inserted_events,

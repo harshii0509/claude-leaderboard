@@ -4,10 +4,12 @@ import Link from 'next/link'
 import type { CSSProperties } from 'react'
 import StatCard from '@/components/StatCard'
 import ActivityHeatmap from '@/components/ActivityHeatmap'
+import ProfileWidgetPanel from '@/components/ProfileWidgetPanel'
 import ProfileShareButton from '@/components/ProfileShareButton'
 import DeleteAccountButton from './DeleteAccountButton'
 import { computeStreaks } from '@/lib/leaderboard-math'
 import { canCurrentUserSelfDelete, requireActiveSession } from '@/lib/access'
+import { getOrCreateUserWidgetSettings } from '@/lib/user-widget'
 import {
   getUsageModelLabel,
   getUsageProviderLabel,
@@ -80,7 +82,10 @@ export default async function ProfilePage() {
     canCurrentUserSelfDelete(),
   ])
 
-  const { stats, activity } = await getUserStats(session.user.id)
+  const [{ stats, activity }, widgetSettings] = await Promise.all([
+    getUserStats(session.user.id),
+    getOrCreateUserWidgetSettings(session.user.id),
+  ])
 
   const status = syncStatus(stats?.last_synced_at ?? null)
   const syncLabel = relativeTime(stats?.last_synced_at ?? null)
@@ -203,6 +208,14 @@ export default async function ProfilePage() {
           <p className="text-xs text-[var(--color-muted)] uppercase tracking-wider font-bold mb-4">Activity</p>
           <ActivityHeatmap activity={activity} />
         </div>
+
+        <ProfileWidgetPanel
+          initialSettings={widgetSettings}
+          displayName={session.user.name ?? session.user.email ?? 'Anonymous'}
+          image={session.user.image ?? null}
+          currentStreak={stats?.current_streak ?? 0}
+          activity={activity}
+        />
 
         {/* Usage breakdown */}
         {stats?.usage_breakdown?.sources?.length ? (

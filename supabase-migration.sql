@@ -160,6 +160,18 @@ create table if not exists public.daily_activity (
 create index if not exists daily_activity_user_date_idx
   on public.daily_activity (user_id, date desc);
 
+create table if not exists public.user_widget_settings (
+  user_id uuid primary key references next_auth.users(id) on delete cascade,
+  public_id text not null unique,
+  is_published boolean not null default false,
+  preset text not null default 'arcade',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists user_widget_settings_public_id_idx
+  on public.user_widget_settings (public_id);
+
 -- ============================================================
 -- Data migration from legacy schema
 -- ============================================================
@@ -734,6 +746,7 @@ alter table next_auth.sessions enable row level security;
 alter table next_auth.verification_tokens enable row level security;
 alter table public.user_stats enable row level security;
 alter table public.daily_activity enable row level security;
+alter table public.user_widget_settings enable row level security;
 alter table leaderboard_private.sync_credentials enable row level security;
 alter table leaderboard_private.install_tokens enable row level security;
 alter table leaderboard_private.raw_usage_events enable row level security;
@@ -748,6 +761,7 @@ drop policy if exists "deny all next_auth sessions" on next_auth.sessions;
 drop policy if exists "deny all next_auth verification tokens" on next_auth.verification_tokens;
 drop policy if exists "deny all user stats" on public.user_stats;
 drop policy if exists "deny all daily activity" on public.daily_activity;
+drop policy if exists "deny all user widget settings" on public.user_widget_settings;
 drop policy if exists "deny all sync credentials" on leaderboard_private.sync_credentials;
 drop policy if exists "deny all install tokens" on leaderboard_private.install_tokens;
 drop policy if exists "deny all raw usage events" on leaderboard_private.raw_usage_events;
@@ -789,6 +803,13 @@ with check (false);
 
 create policy "deny all daily activity"
 on public.daily_activity
+for all
+to authenticated, anon
+using (false)
+with check (false);
+
+create policy "deny all user widget settings"
+on public.user_widget_settings
 for all
 to authenticated, anon
 using (false)

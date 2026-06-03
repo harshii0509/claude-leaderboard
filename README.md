@@ -26,6 +26,7 @@ Vercel is treated as production-only for this repo. The `internal` branch is the
 - **Team leaderboard** — rank members by tokens, messages, or streak
 - **Podium view** — spotlight your top 3 contributors
 - **Activity heatmap** — 90-day GitHub-style heatmap per user
+- **Profile widgets** — publish a personal activity widget for websites and portfolios
 - **Model breakdown** — see which Claude and Codex models each person uses
 - **Streak tracking** — current and longest usage streaks
 - **Auto-sync** — a Claude Code hook pushes stats automatically after every session
@@ -244,6 +245,8 @@ See [docs/leaderboard-case-study.md](docs/leaderboard-case-study.md) for a detai
 For the one-time rollout message after a global rescan, see [docs/team-resync-message.md](docs/team-resync-message.md).
 
 For self-serve deployment guidance aimed at outside teams, see [docs/self-hosting.md](docs/self-hosting.md).
+
+For widget publishing and embed paths, see [docs/widget-embeds.md](docs/widget-embeds.md).
 
 If you want to delegate that setup to an agent, use [docs/agent-setup.md](docs/agent-setup.md).
 

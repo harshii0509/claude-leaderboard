@@ -2,6 +2,7 @@ import { revalidateTag } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { ensureInstanceMembership, performInstanceMemberAction } from '@/lib/instance-membership'
 import { canAccessAdmin } from '@/lib/membership-rules'
+import { getPublishedWidgetPublicId } from '@/lib/user-widget'
 
 interface AdminMemberActionPayload {
   action?: string
@@ -47,6 +48,10 @@ export async function POST(request: Request) {
     revalidateTag('leaderboard', 'max')
     revalidateTag(`user-stats:${payload.targetUserId}`, 'max')
     revalidateTag(`activity:${payload.targetUserId}`, 'max')
+    const publicWidgetId = await getPublishedWidgetPublicId(payload.targetUserId).catch(() => null)
+    if (publicWidgetId) {
+      revalidateTag(`public-widget:${publicWidgetId}`, 'max')
+    }
 
     return Response.json({ ok: true })
   } catch (error) {

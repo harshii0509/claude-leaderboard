@@ -1,8 +1,9 @@
 'use client'
 
 import { Fragment, useRef, useEffect, useState } from 'react'
+import { DEFAULT_WIDGET_PRESET, type WidgetPreset } from '@/lib/widget-types'
 
-interface DayData {
+export interface DayData {
   date: string
   input_tokens: number
   output_tokens: number
@@ -14,6 +15,8 @@ interface DayData {
 
 interface ActivityHeatmapProps {
   activity: DayData[]
+  preset?: WidgetPreset
+  compact?: boolean
 }
 
 interface Cell {
@@ -37,21 +40,42 @@ function intensity(tokens: number, max: number) {
   return Math.ceil((tokens / max) * 4)
 }
 
-const COLORS = [
-  'bg-[var(--color-surface-2)]',
-  'bg-[var(--color-accent)]/20',
-  'bg-[var(--color-accent)]/40',
-  'bg-[var(--color-accent)]/70',
-  'bg-[var(--color-accent)]',
-]
+const PRESET_COLORS: Record<WidgetPreset, string[]> = {
+  arcade: [
+    'bg-[var(--color-surface-2)]',
+    'bg-[var(--color-accent)]/20',
+    'bg-[var(--color-accent)]/40',
+    'bg-[var(--color-accent)]/70',
+    'bg-[var(--color-accent)]',
+  ],
+  night: [
+    'bg-slate-800/70',
+    'bg-cyan-400/15',
+    'bg-cyan-400/35',
+    'bg-cyan-300/65',
+    'bg-cyan-200',
+  ],
+  paper: [
+    'bg-stone-200',
+    'bg-amber-500/20',
+    'bg-amber-500/35',
+    'bg-amber-600/65',
+    'bg-amber-700',
+  ],
+}
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const DAY_LABELS: Record<number, string> = { 1: 'Mon', 3: 'Wed', 5: 'Fri' }
 
-export default function ActivityHeatmap({ activity }: ActivityHeatmapProps) {
+export default function ActivityHeatmap({
+  activity,
+  preset = DEFAULT_WIDGET_PRESET,
+  compact = false,
+}: ActivityHeatmapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(480)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const colors = PRESET_COLORS[preset] ?? PRESET_COLORS.arcade
 
   useEffect(() => {
     const el = containerRef.current
@@ -64,7 +88,8 @@ export default function ActivityHeatmap({ activity }: ActivityHeatmapProps) {
   }, [])
 
   // Fill the container with whole weeks at the fixed cell size
-  const numWeeks = Math.max(8, Math.floor((containerWidth - DAY_LABEL_W) / (CELL + GAP)))
+  const minWeeks = compact ? 12 : 8
+  const numWeeks = Math.max(minWeeks, Math.floor((containerWidth - DAY_LABEL_W) / (CELL + GAP)))
   const numDays = numWeeks * 7
 
   const today = new Date()
@@ -131,7 +156,7 @@ export default function ActivityHeatmap({ activity }: ActivityHeatmapProps) {
               return (
                 <div
                   key={wi}
-                  className={`heatmap-cell rounded-sm ${cell.tokens > 0 ? 'cursor-pointer' : ''} ${COLORS[intensity(cell.tokens, max)]}`}
+                  className={`heatmap-cell rounded-sm ${cell.tokens > 0 ? 'cursor-pointer' : ''} ${colors[intensity(cell.tokens, max)]}`}
                   style={{ '--week-index': wi } as React.CSSProperties}
                   onMouseEnter={(e) => setTooltip({ cell, rect: e.currentTarget.getBoundingClientRect() })}
                   onMouseLeave={() => setTooltip(null)}

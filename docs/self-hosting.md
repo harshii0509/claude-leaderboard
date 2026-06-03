@@ -9,6 +9,7 @@ The current production deployment can keep running exactly as-is. This repo is b
 - the same raw-event sync pipeline
 - the same streak and scoring logic
 - the same reset, rebuild, and rescan controls
+- the same publishable personal widget embeds
 
 ## What you are deploying
 
@@ -20,7 +21,8 @@ At a high level:
 2. Each user gets a one-line Setup command from `/setup`.
 3. That installer writes a local `sync.py` script plus a personal sync credential.
 4. Claude Code Stop hooks run the script after each session.
-5. The server ingests raw usage events and computes leaderboard rollups.
+5. The same local collector can also ingest Codex and OpenCode usage when those tools are present on the machine.
+6. The server ingests raw usage events and computes leaderboard rollups.
 
 ## Recommended stack
 
@@ -200,6 +202,20 @@ After deploy:
 3. Run either the quick install command or the inspect-before-run command on your own machine.
 4. Run `python3 ~/.claude/sync.py` once to confirm sync works.
 5. Open the homepage and verify your leaderboard entry appears.
+6. Open `/profile` and verify the widget publishing panel appears if you want personal embeds enabled for users.
+
+## Widget publishing
+
+Each user can optionally publish a personal activity widget from `/profile`.
+
+That widget currently supports:
+
+- a public iframe page
+- a public JSON contract
+- a React package integration path
+- Framer embed-block usage through the iframe snippet
+
+For the detailed embed and package workflow, see [docs/widget-embeds.md](widget-embeds.md).
 
 ## Team rollout flow
 
@@ -208,7 +224,7 @@ For each teammate:
 1. They sign in.
 2. They open `/setup`.
 3. They run the one-line install command.
-4. Claude begins auto-syncing after each session.
+4. Claude begins auto-syncing after each session, while Codex and OpenCode history are picked up during manual or installer-triggered syncs on the same machine.
 
 The installer is TTY-aware and safe to rerun. It will:
 

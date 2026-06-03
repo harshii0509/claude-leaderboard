@@ -40,6 +40,12 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Build widget package
+        run: npm run build:widget-react
+
+      - name: Verify widget package contents
+        run: npm run verify:widget-react
+
       - name: Test
         run: npm test
 
