@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { useEffect } from 'react'
-import { playPodium } from '@/lib/audio'
+import { isAudioReady, playPodium } from '@/lib/audio'
 
 export interface LeaderboardEntry {
   user_id: string
@@ -66,6 +66,7 @@ function fmt(n: number) {
 
 export default function Podium({ top3 }: PodiumProps) {
   useEffect(() => {
+    if (!isAudioReady()) return
     const t = setTimeout(playPodium, 300)
     return () => clearTimeout(t)
   }, [])

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { playSort } from '@/lib/audio'
+import { playSort, unlockAudio } from '@/lib/audio'
 
 type Sort = 'tokens' | 'messages' | 'streak'
 type Period = '7d' | '30d' | 'all'
@@ -17,8 +17,9 @@ export default function SortBar({ sort, period, onSort, onPeriod }: SortBarProps
   const [justSelected, setJustSelected] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const selectWithPop = (key: string, action: () => void) => {
+  const selectWithPop = async (key: string, action: () => void) => {
     if (timerRef.current) clearTimeout(timerRef.current)
+    await unlockAudio()
     playSort()
     action()
     setJustSelected(key)
@@ -42,7 +43,12 @@ export default function SortBar({ sort, period, onSort, onPeriod }: SortBarProps
           <button
             key={s}
             className={`${sort === s ? active : inactive}${justSelected === s ? ' btn-select' : ''}`}
-            onClick={() => selectWithPop(s, () => onSort(s))}
+            onPointerDown={() => {
+              void unlockAudio()
+            }}
+            onClick={() => {
+              void selectWithPop(s, () => onSort(s))
+            }}
           >
             {s === 'tokens' ? 'Tokens' : s === 'messages' ? 'Messages' : 'Streak'}
           </button>
@@ -53,7 +59,12 @@ export default function SortBar({ sort, period, onSort, onPeriod }: SortBarProps
           <button
             key={p}
             className={`${period === p ? active : inactive}${justSelected === p ? ' btn-select' : ''}`}
-            onClick={() => selectWithPop(p, () => onPeriod(p))}
+            onPointerDown={() => {
+              void unlockAudio()
+            }}
+            onClick={() => {
+              void selectWithPop(p, () => onPeriod(p))
+            }}
           >
             {p === 'all' ? 'All time' : p}
           </button>
