@@ -31,6 +31,12 @@ CODEX_LOG_DB = CODEX_DIR / "logs_2.sqlite"
 SCHEMA_VERSION = 2
 SCRIPT_VERSION = "2.2.0"
 MAX_EVENTS_PER_BATCH = 5000
+CLAUDE_USAGE_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+)
 
 CODEX_FIELD_PATTERNS = {
     "thread_id": re.compile(r"(?:thread\.id|thread_id)=([0-9a-f-]{8,})"),
@@ -47,6 +53,19 @@ CODEX_FIELD_PATTERNS = {
 
 def stderr(message: str):
     print(message, file=sys.stderr)
+
+
+def fresh_diagnostics():
+    return {
+        "suspicious_claude_usage_events": 0,
+        "zero_token_claude_events": 0,
+    }
+
+
+def merge_diagnostics(into, extra):
+    for key, value in extra.items():
+        into[key] = into.get(key, 0) + int(value or 0)
+    return into
 
 
 def fresh_cache(sync_generation=None):
@@ -139,13 +158,43 @@ def build_event_id(session_id, msg_id, timestamp, model, usage):
     return "synthetic_" + hashlib.sha1(fingerprint).hexdigest()
 
 
+def usage_contains_token_like_keys(usage):
+    if not isinstance(usage, dict):
+        return False
+
+    for key in usage.keys():
+        normalized = str(key).strip().lower()
+        if "token" in normalized or "cache" in normalized:
+            return True
+
+    return False
+
+
+def parse_claude_usage(usage):
+    diagnostics = fresh_diagnostics()
+    extracted = {field: 0 for field in CLAUDE_USAGE_FIELDS}
+
+    if not isinstance(usage, dict):
+        return extracted, diagnostics
+
+    for field in CLAUDE_USAGE_FIELDS:
+        extracted[field] = int(usage.get(field, 0) or 0)
+
+    if sum(extracted.values()) == 0 and usage_contains_token_like_keys(usage):
+        diagnostics["zero_token_claude_events"] += 1
+        diagnostics["suspicious_claude_usage_events"] += 1
+
+    return extracted, diagnostics
+
+
 def iter_events(path: Path, state):
     events = {}
+    diagnostics = fresh_diagnostics()
     file_key = str(path)
     try:
         stat = path.stat()
     except OSError:
-        return events, None
+        return events, None, diagnostics
 
     cached = state.get(file_key, {})
     offset = cached.get("offset", 0)
@@ -192,6 +241,8 @@ def iter_events(path: Path, state):
                 continue
             msg_id = msg.get("id")
             event_id = build_event_id(session_id, msg_id, normalized_ts or timestamp, model, usage)
+            usage_parts, usage_diagnostics = parse_claude_usage(usage)
+            merge_diagnostics(diagnostics, usage_diagnostics)
 
             events[event_id] = {
                 "event_id": event_id,
@@ -200,10 +251,10 @@ def iter_events(path: Path, state):
                 "event_timestamp": normalized_ts or datetime.now().astimezone().isoformat(),
                 "activity_date": activity_date,
                 "model": model,
-                "input_tokens": int(usage.get("input_tokens", 0) or 0),
-                "output_tokens": int(usage.get("output_tokens", 0) or 0),
-                "cache_creation_input_tokens": int(usage.get("cache_creation_input_tokens", 0) or 0),
-                "cache_read_input_tokens": int(usage.get("cache_read_input_tokens", 0) or 0),
+                "input_tokens": usage_parts["input_tokens"],
+                "output_tokens": usage_parts["output_tokens"],
+                "cache_creation_input_tokens": usage_parts["cache_creation_input_tokens"],
+                "cache_read_input_tokens": usage_parts["cache_read_input_tokens"],
                 "stop_reason": stop_reason,
                 "source_path": file_key,
                 "source": "claude",
@@ -216,7 +267,7 @@ def iter_events(path: Path, state):
         "size": stat.st_size,
         "mtime_ns": stat.st_mtime_ns,
     }
-    return events, next_state
+    return events, next_state, diagnostics
 
 
 def build_ssl_context():
@@ -345,24 +396,26 @@ def collect_events(cache):
     projects_dir = CLAUDE_DIR / "projects"
     next_files = {}
     events = {}
+    diagnostics = fresh_diagnostics()
 
     if projects_dir.exists():
         for jsonl_file in sorted(projects_dir.rglob("*.jsonl")):
-            file_events, next_state = iter_events(jsonl_file, cache["files"])
+            file_events, next_state, file_diagnostics = iter_events(jsonl_file, cache["files"])
             if next_state is not None:
                 next_files[str(jsonl_file)] = next_state
             for event_id, event in file_events.items():
                 events[event_id] = event
+            merge_diagnostics(diagnostics, file_diagnostics)
 
     codex_events, codex_state = iter_codex_events(cache.get("codex", {}))
     for event_id, event in codex_events.items():
         events[event_id] = event
 
-    return list(events.values()), next_files, codex_state
+    return list(events.values()), next_files, codex_state, diagnostics
 
 
 def sync_once(api_url, sync_token, cache):
-    ordered_events, next_files, codex_state = collect_events(cache)
+    ordered_events, next_files, codex_state, diagnostics = collect_events(cache)
     server_generation = cache.get("sync_generation")
     batches = list(chunked(ordered_events, MAX_EVENTS_PER_BATCH)) or [[]]
 
@@ -372,7 +425,7 @@ def sync_once(api_url, sync_token, cache):
         if isinstance(generation, int):
             server_generation = generation
 
-    return next_files, codex_state, server_generation
+    return next_files, codex_state, server_generation, diagnostics
 
 
 def hook_present():
@@ -430,7 +483,7 @@ def run_doctor(quiet=False):
 def run_dry_run():
     load_config()
     cache = load_cache()
-    ordered_events, next_files, codex_state = collect_events(cache)
+    ordered_events, next_files, codex_state, diagnostics = collect_events(cache)
     summary = {
         "script_version": SCRIPT_VERSION,
         "schema_version": SCHEMA_VERSION,
@@ -438,6 +491,7 @@ def run_dry_run():
         "claude_sources": len(next_files),
         "codex_state_present": codex_state is not None,
         "api_url": load_config().get("api_url", "http://localhost:3000/api/sync"),
+        **diagnostics,
     }
     print(json.dumps(summary, indent=2))
 
@@ -449,7 +503,7 @@ def run_sync():
 
     cache = load_cache()
     cached_generation = cache.get("sync_generation")
-    next_files, codex_state, server_generation = sync_once(api_url, sync_token, cache)
+    next_files, codex_state, server_generation, diagnostics = sync_once(api_url, sync_token, cache)
 
     if (
         isinstance(cached_generation, int)
@@ -457,7 +511,7 @@ def run_sync():
         and server_generation != cached_generation
     ):
         cache = fresh_cache(server_generation)
-        next_files, codex_state, server_generation = sync_once(api_url, sync_token, cache)
+        next_files, codex_state, server_generation, diagnostics = sync_once(api_url, sync_token, cache)
 
     cache["files"] = next_files
     if codex_state is not None:
@@ -465,6 +519,12 @@ def run_sync():
     if isinstance(server_generation, int):
         cache["sync_generation"] = server_generation
     save_cache(cache)
+
+    suspicious_events = diagnostics.get("suspicious_claude_usage_events", 0)
+    if suspicious_events > 0:
+        stderr(
+            f"Warning: detected {suspicious_events} Claude usage event(s) with token-like fields but zero recognized token counters. Run --dry-run to inspect local history."
+        )
 
 
 def parse_args():

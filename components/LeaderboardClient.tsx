@@ -1,7 +1,8 @@
 'use client'
 
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import useSWR from 'swr'
+import { clientQueryKeys, fetchApiJson } from '@/lib/client-query'
 import Podium, { LeaderboardEntry } from './Podium'
 import RankingsTable from './RankingsTable'
 import SortBar from './SortBar'
@@ -9,18 +10,6 @@ import UserProfileModal from './UserProfileModal'
 
 type Sort = 'tokens' | 'messages' | 'streak'
 type Period = '7d' | '30d' | 'all'
-
-async function fetcher(url: string) {
-  const response = await fetch(url)
-  const payload = await response.json()
-
-  if (!response.ok) {
-    const message = payload && typeof payload.error === 'string' ? payload.error : 'Failed to load leaderboard'
-    throw new Error(message)
-  }
-
-  return payload
-}
 
 interface LeaderboardClientProps {
   initialData: LeaderboardEntry[]
@@ -31,17 +20,24 @@ export default function LeaderboardClient({ initialData, initialLoadFailed = fal
   const [sort, setSort] = useState<Sort>('tokens')
   const [period, setPeriod] = useState<Period>('all')
   const [selectedUser, setSelectedUser] = useState<LeaderboardEntry | null>(null)
+  const shouldUseInitialData = sort === 'tokens' && period === 'all'
 
-  const { data, error, isLoading } = useSWR<LeaderboardEntry[]>(
-    `/api/leaderboard?sort=${sort}&period=${period}`,
-    fetcher,
-    { fallbackData: initialData, refreshInterval: 60_000 }
-  )
+  const { data, error, isPending } = useQuery<LeaderboardEntry[]>({
+    queryKey: clientQueryKeys.leaderboard(sort, period),
+    queryFn: () =>
+      fetchApiJson<LeaderboardEntry[]>(
+        `/api/leaderboard?sort=${sort}&period=${period}`,
+        'Failed to load leaderboard',
+      ),
+    initialData: shouldUseInitialData ? initialData : undefined,
+    placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+  })
 
   const entries = Array.isArray(data) ? data : []
   const top3 = entries.slice(0, 3)
   const hasError = Boolean(error) || initialLoadFailed
-  const showEmpty = !isLoading && entries.length === 0
+  const showEmpty = !isPending && entries.length === 0
   const errorMessage = error instanceof Error ? error.message : 'Leaderboard data is temporarily unavailable.'
 
   return (

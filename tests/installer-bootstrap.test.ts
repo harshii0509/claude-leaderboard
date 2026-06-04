@@ -43,10 +43,10 @@ async function runCommand(command: string, args: string[], options: {
 }
 
 async function withInstallServer(
-  handler: (baseUrl: string, state: { exchangeCount: number; syncScript: string }) => Promise<void> | void,
+  handler: (baseUrl: string, state: { exchangeCount: number; syncScript: string; syncPayloads: unknown[] }) => Promise<void> | void,
 ) {
   const syncScript = await readFile(path.join(process.cwd(), 'public/sync.py'), 'utf8')
-  const state = { exchangeCount: 0, syncScript }
+  const state = { exchangeCount: 0, syncScript, syncPayloads: [] as unknown[] }
 
   const server = createServer(async (req, res) => {
     if (!req.url) {
@@ -73,6 +73,12 @@ async function withInstallServer(
     }
 
     if (req.method === 'POST' && req.url === '/api/sync') {
+      let body = ''
+      req.on('data', (chunk) => {
+        body += chunk.toString()
+      })
+      await new Promise<void>((resolve) => req.on('end', () => resolve()))
+      state.syncPayloads.push(JSON.parse(body || '{}'))
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({ ok: true, sync_generation: 2 }))
       return
@@ -196,6 +202,8 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
       assert.equal(result.status, 0, result.stderr)
       const dryRun = JSON.parse(result.stdout)
       assert.equal(dryRun.event_count, 1)
+      assert.equal(dryRun.suspicious_claude_usage_events, 0)
+      assert.equal(dryRun.zero_token_claude_events, 0)
 
       await writeFile(scriptFile, buildInstallBootstrapScript(baseUrl, 'install-token-2'), 'utf8')
       result = await runCommand('bash', [scriptFile], {
@@ -204,6 +212,92 @@ test('inspect-first bootstrap installs, upgrades, and exposes doctor and dry-run
       })
       assert.equal(result.status, 0, result.stderr)
       assert.match(result.stdout, /upgrade complete/)
+    } finally {
+      await rm(homeDir, { recursive: true, force: true })
+    }
+  })
+})
+
+test('dry-run reports suspicious Claude usage shapes and sync warns without crashing', async () => {
+  await withInstallServer(async (baseUrl, state) => {
+    const homeDir = await createTempHome()
+    const scriptFile = path.join(homeDir, 'install.sh')
+
+    try {
+      await writeFile(scriptFile, buildInstallBootstrapScript(baseUrl, 'install-token-suspicious'), 'utf8')
+      let result = await runCommand('bash', [scriptFile], {
+        cwd: process.cwd(),
+        env: { ...process.env, HOME: homeDir },
+      })
+      assert.equal(result.status, 0, result.stderr)
+
+      const syncScriptPath = path.join(homeDir, '.claude', 'sync.py')
+      const projectDir = path.join(homeDir, '.claude', 'projects', 'demo')
+      await mkdir(projectDir, { recursive: true })
+      await writeFile(
+        path.join(projectDir, 'session.jsonl'),
+        `${JSON.stringify({
+          type: 'assistant',
+          sessionId: 'session-suspicious-1',
+          timestamp: '2026-06-02T10:00:00.000Z',
+          message: {
+            id: 'msg-suspicious-1',
+            model: 'claude-opus-4',
+            stop_reason: 'end_turn',
+            usage: {
+              prompt_tokens: 12,
+              completion_tokens: 8,
+              cache_tokens: 4,
+            },
+          },
+        })}\n`,
+        'utf8',
+      )
+
+      result = await runCommand('python3', [syncScriptPath, '--dry-run'], {
+        cwd: process.cwd(),
+        env: { ...process.env, HOME: homeDir },
+      })
+      assert.equal(result.status, 0, result.stderr)
+      const dryRun = JSON.parse(result.stdout)
+      assert.equal(dryRun.event_count, 1)
+      assert.equal(dryRun.suspicious_claude_usage_events, 1)
+      assert.equal(dryRun.zero_token_claude_events, 1)
+
+      result = await runCommand('python3', [syncScriptPath], {
+        cwd: process.cwd(),
+        env: { ...process.env, HOME: homeDir },
+      })
+      assert.equal(result.status, 0, result.stderr)
+      assert.match(result.stderr, /Warning: detected 1 Claude usage event/)
+      assert.equal(state.syncPayloads.length, 1)
+
+      const payload = state.syncPayloads[0] as {
+        events?: Array<{
+          source: string
+          input_tokens: number
+          output_tokens: number
+          cache_creation_input_tokens: number
+          cache_read_input_tokens: number
+        }>
+      }
+      const suspiciousEvent = payload.events?.find((event) => event.source === 'claude')
+      assert.deepEqual(
+        suspiciousEvent && {
+          source: suspiciousEvent.source,
+          input_tokens: suspiciousEvent.input_tokens,
+          output_tokens: suspiciousEvent.output_tokens,
+          cache_creation_input_tokens: suspiciousEvent.cache_creation_input_tokens,
+          cache_read_input_tokens: suspiciousEvent.cache_read_input_tokens,
+        },
+        {
+          source: 'claude',
+          input_tokens: 0,
+          output_tokens: 0,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+        },
+      )
     } finally {
       await rm(homeDir, { recursive: true, force: true })
     }

@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
+import type { CSSProperties } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
+import { clientQueryKeys, fetchApiJson } from '@/lib/client-query'
 import ActivityHeatmap from './ActivityHeatmap'
 import { LeaderboardEntry } from './Podium'
 
@@ -26,6 +29,15 @@ interface DayData {
 interface ModelEntry {
   model: string
   count: number
+}
+
+interface UserStatsPayload {
+  models_used?: Record<string, number> | null
+}
+
+interface UserProfileDetail {
+  activity: DayData[]
+  models: ModelEntry[]
 }
 
 const RING_CLASS: Record<number, string> = { 1: 'rank-1', 2: 'rank-2', 3: 'rank-3' }
@@ -71,14 +83,27 @@ const statsItem = {
 }
 
 export default function UserProfileModal({ entry, rank, onClose }: UserProfileModalProps) {
-  const [activity, setActivity] = useState<DayData[]>([])
-  const [models, setModels] = useState<ModelEntry[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
   const shouldReduce = useReducedMotion() ?? false
 
   const ringClass = RING_CLASS[rank] ?? 'rank-default'
   const badge = RANK_BADGE[rank]
+  const profileQuery = useQuery<UserProfileDetail>({
+    queryKey: clientQueryKeys.userProfile(entry.user_id),
+    queryFn: async () => {
+      const [activityPayload, statsPayload] = await Promise.all([
+        fetchApiJson<DayData[]>(`/api/activity/${entry.user_id}`, 'Failed to load activity'),
+        fetchApiJson<UserStatsPayload>(`/api/user-stats/${entry.user_id}`, 'Failed to load profile stats'),
+      ])
+      const models = Object.entries(statsPayload.models_used ?? {})
+        .map(([model, count]) => ({ model, count: count as number }))
+        .sort((a, b) => b.count - a.count)
+
+      return {
+        activity: activityPayload ?? [],
+        models,
+      }
+    },
+  })
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -87,63 +112,29 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
   }, [])
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [actRes, statsRes] = await Promise.all([
-          fetch(`/api/activity/${entry.user_id}`),
-          fetch(`/api/user-stats/${entry.user_id}`),
-        ])
-        const activityPayload = await actRes.json()
-        const statsPayload = await statsRes.json()
-
-        if (!actRes.ok) {
-          throw new Error(
-            activityPayload && typeof activityPayload.error === 'string'
-              ? activityPayload.error
-              : 'Failed to load activity'
-          )
-        }
-
-        if (!statsRes.ok) {
-          throw new Error(
-            statsPayload && typeof statsPayload.error === 'string'
-              ? statsPayload.error
-              : 'Failed to load profile stats'
-          )
-        }
-
-        setActivity(activityPayload)
-        const mu = statsPayload.models_used ?? {}
-        setModels(
-          Object.entries(mu)
-            .map(([model, count]) => ({ model, count: count as number }))
-            .sort((a, b) => b.count - a.count)
-        )
-        setLoadError(null)
-      } catch (error) {
-        setLoadError(error instanceof Error ? error.message : 'Could not load this profile right now.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [entry.user_id])
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  const activity = profileQuery.data?.activity ?? []
+  const models = profileQuery.data?.models ?? []
+  const loading = profileQuery.isPending
+  const loadError = profileQuery.error instanceof Error ? profileQuery.error.message : null
   const totalModelCount = models.reduce((s, m) => s + m.count, 0) || 1
   const totalTokens = entry.total_tokens || 1
 
   const tokenBreakdown = [
-    { label: 'Input',  value: entry.total_input_tokens,  color: 'var(--color-accent-2)' },
+    { label: 'Non-cached input', value: entry.total_input_tokens, color: 'var(--color-accent-2)' },
     { label: 'Output', value: entry.total_output_tokens, color: 'var(--color-accent)' },
     {
-      label: 'Cache',
-      value: entry.total_cache_creation_input_tokens + entry.total_cache_read_input_tokens,
+      label: 'Cache write',
+      value: entry.total_cache_creation_input_tokens,
+      color: 'var(--color-gold)',
+    },
+    {
+      label: 'Cache read',
+      value: entry.total_cache_read_input_tokens,
       color: 'var(--color-gold)',
     },
   ]
@@ -288,6 +279,9 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
           {/* Token breakdown */}
           <div className="w-full border-t border-[var(--color-border)]/15 pt-4">
             <p className="text-xs text-[var(--color-muted)] mb-3 font-bold">Token breakdown</p>
+            <p className="mb-3 text-xs text-[var(--color-muted)]">
+              Non-cached input excludes prompt cache hits. Cache-heavy Claude sessions can legitimately make input and output look small next to cache write and cache read.
+            </p>
             {loadError && (
               <div className="mb-3 rounded-[12px] border border-[var(--color-red)]/30 bg-[var(--color-red)]/10 px-3 py-2 text-xs text-[var(--color-text)]">
                 {loadError}
@@ -295,14 +289,16 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
             )}
             <div className="flex flex-col gap-2.5">
               {tokenBreakdown.map(({ label, value, color }, i) => {
-                const pct = Math.round((value / totalTokens) * 100)
+                const pct = value > 0
+                  ? Math.max(2, Math.round((value / totalTokens) * 100))
+                  : 0
                 return (
                   <div key={label} className="flex items-center gap-2 text-sm">
-                    <span className="w-24 text-[var(--color-muted)] font-bold">{label}</span>
+                    <span className="w-28 text-[var(--color-muted)] font-bold">{label}</span>
                     <div className="game-progress-track flex-1 h-4">
                       <div
                         className="game-progress-fill model-bar"
-                        style={{ width: `${pct}%`, background: color, '--bar-index': i } as React.CSSProperties}
+                        style={{ width: `${pct}%`, background: color, '--bar-index': i } as CSSProperties}
                       />
                     </div>
                     <span className="w-16 text-right text-[var(--color-muted)] tabular-nums font-bold">{fmt(value)}</span>
@@ -332,7 +328,7 @@ export default function UserProfileModal({ entry, rank, onClose }: UserProfileMo
                           <div className="game-progress-track flex-1 h-4">
                             <div
                               className="game-progress-fill model-bar bg-[var(--color-accent)]"
-                              style={{ width: `${pct}%`, '--bar-index': index } as React.CSSProperties}
+                              style={{ width: `${pct}%`, '--bar-index': index } as CSSProperties}
                             />
                           </div>
                           <span className="w-16 text-right text-[var(--color-muted)] tabular-nums font-bold">{pct}%</span>
