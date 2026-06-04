@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useState } from 'react'
 import ActivityWidget from './ActivityWidget'
 import type { DayData } from './ActivityHeatmap'
+import { clientQueryKeys, fetchApiJson } from '@/lib/client-query'
 import { buildIframeEmbedSnippet, buildPublicWidgetApiUrl, buildPublicWidgetUrl, buildReactEmbedSnippet } from '@/lib/widget-embed'
 import {
   WIDGET_PRESETS,
@@ -29,11 +31,60 @@ export default function ProfileWidgetPanel({
   currentStreak,
   activity,
 }: ProfileWidgetPanelProps) {
-  const [settings, setSettings] = useState(initialSettings)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [pending, startTransition] = useTransition()
+  const [clipboardError, setClipboardError] = useState<string | null>(null)
   const [origin, setOrigin] = useState('http://localhost:3000')
+  const queryClient = useQueryClient()
+
+  const widgetSettingsQuery = useQuery<UserWidgetSettings>({
+    queryKey: clientQueryKeys.widgetSettings(),
+    queryFn: async () => {
+      const body = await fetchApiJson<WidgetSettingsResponse>(
+        '/api/profile/widget',
+        'Could not load widget settings',
+      )
+
+      if (!body.settings) {
+        throw new Error('Could not load widget settings.')
+      }
+
+      return body.settings
+    },
+    initialData: initialSettings,
+  })
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (
+      payload: Partial<{ isPublished: boolean; preset: WidgetPreset; regeneratePublicId: boolean }>,
+    ) => {
+      const body = await fetchApiJson<{ error?: string } & Partial<WidgetSettingsResponse>>(
+        '/api/profile/widget',
+        'Could not update widget settings',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
+      )
+
+      if (!body.settings) {
+        throw new Error(body.error ?? 'Could not update widget settings.')
+      }
+
+      return body.settings
+    },
+    onSuccess: (settings) => {
+      queryClient.setQueryData(clientQueryKeys.widgetSettings(), settings)
+      setClipboardError(null)
+    },
+  })
+
+  const settings = widgetSettingsQuery.data ?? initialSettings
+  const pending = updateSettingsMutation.isPending
+  const error =
+    clipboardError ??
+    (updateSettingsMutation.error instanceof Error ? updateSettingsMutation.error.message : null) ??
+    (widgetSettingsQuery.error instanceof Error ? widgetSettingsQuery.error.message : null)
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -63,33 +114,17 @@ export default function ProfileWidgetPanel({
   )
 
   async function sendUpdate(payload: Partial<{ isPublished: boolean; preset: WidgetPreset; regeneratePublicId: boolean }>) {
-    startTransition(async () => {
-      try {
-        const response = await fetch('/api/profile/widget', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        const body = (await response.json()) as { error?: string } & Partial<WidgetSettingsResponse>
-        if (!response.ok || !body.settings) {
-          throw new Error(body.error ?? 'Could not update widget settings.')
-        }
-
-        setSettings(body.settings)
-        setError(null)
-      } catch (updateError) {
-        setError(updateError instanceof Error ? updateError.message : 'Could not update widget settings.')
-      }
-    })
+    setClipboardError(null)
+    updateSettingsMutation.mutate(payload)
   }
 
   async function copyText(key: string, value: string) {
     try {
       await navigator.clipboard.writeText(value)
       setCopiedKey(key)
-      setError(null)
+      setClipboardError(null)
     } catch {
-      setError('Could not copy to clipboard.')
+      setClipboardError('Could not copy to clipboard.')
     }
   }
 
